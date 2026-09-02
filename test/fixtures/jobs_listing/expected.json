@@ -1,0 +1,16 @@
+{
+  "category": "jobs",
+  "title": "Open roles — Example Labs",
+  "jobCount": 3,
+  "jobTitles": [
+    "Senior Flutter Engineer",
+    "Data Platform Lead",
+    "Design Systems Engineer"
+  ],
+  "emails": [
+    "careers@labs.example",
+    "jobs@labs.example"
+  ],
+  "headingCount": 4,
+  "notes": "Repeating card structure — the shape recipe synthesis targets. Emails via both mailto and plain text."
+}

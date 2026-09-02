@@ -1,0 +1,11 @@
+{
+  "category": "commerce",
+  "title": "Catalogue",
+  "cardCount": 3,
+  "cardTitles": [
+    "Alpha",
+    "Beta",
+    "Gamma"
+  ],
+  "notes": "Same-tag nesting (li.card > div.card) plus a decoy carrying the same class outside the container. Exercises BUG-1 and BUG-2 together."
+}

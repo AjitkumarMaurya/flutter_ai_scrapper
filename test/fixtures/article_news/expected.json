@@ -1,0 +1,16 @@
+{
+  "category": "article",
+  "title": "Coastal towns adapt as tides rise",
+  "author": "Priya Raman",
+  "publishDate": "2024-11-02T06:30:00Z",
+  "canonicalUrl": "https://post.example/2024/11/coastal-towns",
+  "hasOpenGraph": true,
+  "headingCount": 3,
+  "readableMustContain": [
+    "sea-defence work"
+  ],
+  "readableMustNotContain": [
+    "The Example Post"
+  ],
+  "notes": "Readability must keep the article and drop nav, aside and footer."
+}

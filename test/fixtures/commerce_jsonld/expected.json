@@ -1,0 +1,16 @@
+{
+  "category": "commerce",
+  "title": "Aeron Chair — Remastered",
+  "canonicalUrl": "https://shop.example/products/aeron-remastered",
+  "hasOpenGraph": true,
+  "headingCount": 3,
+  "tableCount": 1,
+  "tableRowCount": 3,
+  "emails": [
+    "support@shop.example"
+  ],
+  "mustNotContain": [
+    "SHOULD_NOT_APPEAR"
+  ],
+  "notes": "JSON-LD product; entity-encoded ampersand in title; lazy + srcset images."
+}

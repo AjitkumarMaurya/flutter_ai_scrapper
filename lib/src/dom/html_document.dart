@@ -192,6 +192,7 @@ class HtmlNode {
     _writeBlockText(_element, buffer);
     return buffer
         .toString()
+        .replaceAll(_unicodeSpaces, ' ')
         .replaceAll(RegExp(r'[ \t]+'), ' ')
         .replaceAll(RegExp(r' *\n *'), '\n')
         .replaceAll(RegExp(r'\n{3,}'), '\n\n')
@@ -288,5 +289,18 @@ class HtmlNode {
   }
 }
 
-String _normalizeWhitespace(String value) =>
-    value.replaceAll(RegExp(r'\s+'), ' ').trim();
+/// Spaces that are not the space character.
+///
+/// `&nbsp;` decodes to U+00A0, and a page using it for typographic spacing
+/// leaves those characters sitting inside what callers reasonably expect to be
+/// plain text — so `text.contains('12 %')` fails against `12\u{00A0}%` for
+/// reasons nobody can see. The narrow no-break space, en/em spaces and the
+/// zero-width no-break space cause the same surprise, so they are all folded
+/// to a regular space here.
+final RegExp _unicodeSpaces =
+    RegExp(r'[\u00A0\u1680\u2000-\u200A\u202F\u205F\u3000\uFEFF]');
+
+String _normalizeWhitespace(String value) => value
+    .replaceAll(_unicodeSpaces, ' ')
+    .replaceAll(RegExp(r'\s+'), ' ')
+    .trim();

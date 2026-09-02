@@ -1,0 +1,20 @@
+{
+  "category": "article",
+  "title": "Cafés & culture — a survey",
+  "headingCount": 1,
+  "mustContain": [
+    "Cafés & culture",
+    "12 %",
+    "Brontë",
+    "日本語",
+    "🎉",
+    "é"
+  ],
+  "mustNotContain": [
+    "&amp;",
+    "&eacute;",
+    "&mdash;",
+    "&#233;"
+  ],
+  "notes": "Named, numeric and hex entities plus raw Unicode. 1.x stripped tags before decoding, so &amp; survived into output."
+}

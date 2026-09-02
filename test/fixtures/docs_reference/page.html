@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>API Reference — connect()</title></head>
+<body>
+<main>
+<h1>connect()</h1>
+<p>Opens a connection to the cluster.</p>
+<pre><code>final client = await Client.connect(
+  host: 'db.example',
+  port: 5432,
+);</code></pre>
+<h2>Parameters</h2>
+<ul>
+  <li><code>host</code> — the server hostname</li>
+  <li><code>port</code> — defaults to <code>5432</code></li>
+  <li><code>timeout</code> — a <em>Duration</em>; defaults to <strong>30s</strong></li>
+</ul>
+<h2>See also</h2>
+<ul><li><a href="/api/disconnect">disconnect()</a></li><li><a href="/api/pool">Pool</a></li></ul>
+</main>
+</body></html>

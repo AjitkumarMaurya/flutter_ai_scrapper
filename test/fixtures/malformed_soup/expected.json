@@ -1,0 +1,12 @@
+{
+  "category": "malformed",
+  "title": "Tag Soup",
+  "mustContain": [
+    "UNQUOTED-ATTR",
+    "INNER",
+    "TAIL",
+    "item one",
+    "item two"
+  ],
+  "notes": "Unclosed tags, unquoted and single-quoted attributes, mis-nested inline elements, orphan cells. The parser must recover the way a browser does rather than throwing."
+}

@@ -1,0 +1,7 @@
+{
+  "category": "commerce",
+  "title": "Kettle 1.7L",
+  "headingCount": 1,
+  "listItemCount": 3,
+  "notes": "Microdata offer in EUR — must never be reported as USD (the 1.x currency bug). Note the <title> is deliberately shorter than the itemprop=name, so extractTitle must prefer <title> rather than the h1."
+}

@@ -1,0 +1,7 @@
+{
+  "category": "article",
+  "title": "Bare Bones Post",
+  "hasOpenGraph": false,
+  "headingCount": 1,
+  "notes": "No <title>, no meta, no OG — title must fall back to <h1>."
+}

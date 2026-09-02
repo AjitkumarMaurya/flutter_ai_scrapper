@@ -1,0 +1,12 @@
+{
+  "category": "jobs",
+  "title": "Vacancies",
+  "tableCount": 1,
+  "tableRowCount": 3,
+  "tableHeaders": [
+    "Role",
+    "Team",
+    "Location"
+  ],
+  "notes": "A cell containing a literal pipe — must be escaped in markdown output, not break the row."
+}

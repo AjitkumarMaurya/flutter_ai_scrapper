@@ -1,0 +1,15 @@
+{
+  "category": "docs",
+  "title": "API Reference — connect()",
+  "headingCount": 3,
+  "listItemCount": 5,
+  "markdownMustContain": [
+    "# connect()",
+    "```",
+    "`host`",
+    "**30s**",
+    "*Duration*",
+    "- "
+  ],
+  "notes": "Inline code, fenced blocks and emphasis must survive the markdown pass."
+}
