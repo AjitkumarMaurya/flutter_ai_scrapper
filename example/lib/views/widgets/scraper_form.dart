@@ -70,9 +70,13 @@ class _ScraperFormState extends State<ScraperForm> {
               children: [
                 const Icon(Icons.code, color: Colors.blue),
                 const SizedBox(width: 8),
-                Text(
-                  'Tag-based Scraping',
-                  style: Theme.of(context).textTheme.titleMedium,
+                // Flexible so the title can wrap on a narrow screen. Left
+                // unbounded, this Row overflowed horizontally at 320px wide.
+                Flexible(
+                  child: Text(
+                    'Tag-based Scraping',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
                 ),
               ],
             ),
@@ -140,9 +144,13 @@ class _ScraperFormState extends State<ScraperForm> {
               children: [
                 const Icon(Icons.pattern, color: Colors.orange),
                 const SizedBox(width: 8),
-                Text(
-                  'Regex-based Scraping',
-                  style: Theme.of(context).textTheme.titleMedium,
+                // Flexible so the title can wrap on a narrow screen. Left
+                // unbounded, this Row overflowed horizontally at 320px wide.
+                Flexible(
+                  child: Text(
+                    'Regex-based Scraping',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
                 ),
               ],
             ),

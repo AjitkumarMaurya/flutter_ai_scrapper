@@ -91,38 +91,64 @@ class _ScraperScreenState extends State<ScraperScreen> {
           ),
         ],
       ),
-      body: Consumer<ScraperViewModel>(
-        builder: (context, viewModel, child) {
-          return Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              children: [
-                // Form section
-                ScraperForm(
-                  urlController: _urlController,
-                  tagController: _tagController,
-                  classController: _classController,
-                  regexController: _regexController,
-                  isLoading: viewModel.isLoading,
-                  onTagScrape: () => _performTagScrape(viewModel),
-                  onRegexScrape: () => _performRegexScrape(viewModel),
-                ),
-                const SizedBox(height: 16),
+      body: SafeArea(
+        child: Consumer<ScraperViewModel>(
+          builder: (context, viewModel, child) {
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                // Reserve a usable height for the results pane and give the
+                // form whatever is left, scrolling internally. Without this the
+                // form keeps its full natural height when the on-screen
+                // keyboard opens, squeezing the results below the height its
+                // own header needs — the RenderFlex overflow this layout used
+                // to report. A minimum beats a percentage here: 45% of a short
+                // viewport is still too small, while 220dp is enough for the
+                // card's chrome plus something to read.
+                const resultsMinHeight = 220.0;
+                final formMaxHeight = (constraints.maxHeight -
+                        resultsMinHeight -
+                        16)
+                    .clamp(96.0, constraints.maxHeight);
 
-                // Results section
-                Expanded(
-                  child: ResultsDisplay(
-                    result: viewModel.currentResult,
-                    errorMessage:
-                        viewModel.hasError ? viewModel.errorMessage : null,
-                    isLoading: viewModel.isLoading,
-                    onClear: viewModel.clearResults,
+                return Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    children: [
+                      // Form section
+                      ConstrainedBox(
+                        constraints: BoxConstraints(maxHeight: formMaxHeight),
+                        child: SingleChildScrollView(
+                          child: ScraperForm(
+                            urlController: _urlController,
+                            tagController: _tagController,
+                            classController: _classController,
+                            regexController: _regexController,
+                            isLoading: viewModel.isLoading,
+                            onTagScrape: () => _performTagScrape(viewModel),
+                            onRegexScrape: () => _performRegexScrape(viewModel),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Results section — guaranteed the remaining 45%.
+                      Expanded(
+                        child: ResultsDisplay(
+                          result: viewModel.currentResult,
+                          errorMessage: viewModel.hasError
+                              ? viewModel.errorMessage
+                              : null,
+                          isLoading: viewModel.isLoading,
+                          onClear: viewModel.clearResults,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
-            ),
-          );
-        },
+                );
+              },
+            );
+          },
+        ),
       ),
     );
   }

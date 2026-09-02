@@ -20,16 +20,33 @@ class ResultsDisplay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildHeader(context),
-            const SizedBox(height: 12),
-            Expanded(child: _buildContent(context)),
-          ],
-        ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // On a very short pane — a small phone with the keyboard open — the
+          // card's own padding plus header can exceed the height available,
+          // and the Column overflows before its content gets a chance to
+          // scroll. Shedding the fixed chrome keeps it inside its bounds.
+          final isTight = constraints.maxHeight < 160;
+
+          // Below this there is not enough room for both a label and anything
+          // under it. The content is what the user is here for, so the header
+          // is what goes.
+          final hideHeader = constraints.maxHeight < 110;
+
+          return Padding(
+            padding: EdgeInsets.all(isTight ? 8.0 : 16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (!hideHeader) ...[
+                  _buildHeader(context),
+                  SizedBox(height: isTight ? 4 : 12),
+                ],
+                Expanded(child: _buildContent(context)),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -101,98 +118,102 @@ class ResultsDisplay extends StatelessWidget {
     return _buildResults(context, result!.data);
   }
 
-  Widget _buildEmptyState(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.search,
-            size: 64,
-            color: Theme.of(context).disabledColor,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No scraping performed yet',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: Theme.of(context).disabledColor,
-                ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Enter a URL and scraping parameters to get started',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).disabledColor,
-                ),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _buildEmptyState(BuildContext context) => _buildPlaceholder(
+        context,
+        icon: Icons.search,
+        iconColor: Theme.of(context).disabledColor,
+        title: 'No scraping performed yet',
+        titleColor: Theme.of(context).disabledColor,
+        message: 'Enter a URL and scraping parameters to get started',
+      );
 
   Widget _buildErrorDisplay(BuildContext context, String error) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.error_outline,
-            size: 64,
-            color: Theme.of(context).colorScheme.error,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Scraping Failed',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.error,
-                ),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.errorContainer,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              error,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onErrorContainer,
-                  ),
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ],
+    final scheme = Theme.of(context).colorScheme;
+
+    return _buildPlaceholder(
+      context,
+      icon: Icons.error_outline,
+      iconColor: scheme.error,
+      title: 'Scraping Failed',
+      titleColor: scheme.error,
+      body: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: scheme.errorContainer,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          error,
+          style: Theme.of(context)
+              .textTheme
+              .bodyMedium
+              ?.copyWith(color: scheme.onErrorContainer),
+          textAlign: TextAlign.center,
+        ),
       ),
     );
   }
 
-  Widget _buildNoResultsFound(BuildContext context) {
+  Widget _buildNoResultsFound(BuildContext context) => _buildPlaceholder(
+        context,
+        icon: Icons.search_off,
+        iconColor: Theme.of(context).disabledColor,
+        title: 'No Results Found',
+        titleColor: Theme.of(context).disabledColor,
+        message: 'Try adjusting your search parameters',
+      );
+
+  /// The shared empty / error / no-results state.
+  ///
+  /// Scrollable rather than a bare [Column]: this sits inside an [Expanded] in
+  /// a card, so a short viewport — a small phone, or a tall on-screen keyboard
+  /// pushing the card up — left the fixed 64px icon plus two lines of text
+  /// with nowhere to go, and Flutter reported a RenderFlex overflow. Wrapping
+  /// in a scroll view keeps the content centred when it fits and scrollable
+  /// when it does not.
+  Widget _buildPlaceholder(
+    BuildContext context, {
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required Color titleColor,
+    String? message,
+    Widget? body,
+  }) {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.search_off,
-            size: 64,
-            color: Theme.of(context).disabledColor,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No Results Found',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: Theme.of(context).disabledColor,
-                ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Try adjusting your search parameters',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).disabledColor,
-                ),
-          ),
-        ],
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        child: Column(
+          // Take only the height actually needed, so Center can do its job.
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 64, color: iconColor),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(color: titleColor),
+              textAlign: TextAlign.center,
+            ),
+            if (message != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                message,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodyMedium
+                    ?.copyWith(color: Theme.of(context).disabledColor),
+                textAlign: TextAlign.center,
+              ),
+            ],
+            if (body != null) ...[
+              const SizedBox(height: 8),
+              body,
+            ],
+          ],
+        ),
       ),
     );
   }
