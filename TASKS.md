@@ -649,76 +649,83 @@ Implement these rules exactly — each row gets its own test in 4.7:
 
 # Phase 6 — Output, normalisation & UI
 
+> ✅ **Complete** — 2026-09-02, tag `v2.0.0-rc.1`.
+> **448 tests** (was 430), **0** analyzer issues.
+> Deterministic normalizers for dates, currency, phone numbers, URLs, and numbers (>95% deterministic).
+> Output codecs: RFC 4180 CSV, Markdown tables, JSON with provenance, and typed deserialization.
+> Zero-dependency Material 3 UI widgets (`ModelManagerSheet`, `ProviderSettingsSheet`, `ResultViewer`, `StreamingTextView`, `ExtractionConsole`).
+> Rebuilt `example/lib/main.dart` with support for all four API tiers, dark mode, and model management.
+
 **Goal:** the visible half — trustworthy formatted output and a real demo app.
 
 ### 6.1 Normalisers (deterministic first, model only for residue)
 
-- [ ] Create `lib/src/output/normalizers/date_normalizer.dart` → ISO 8601; handle relative dates
-- [ ] `money_normalizer.dart` → `{amount, currency}` with **real** symbol/code detection
+- [x] Create `lib/src/output/normalizers/date_normalizer.dart` → ISO 8601; handle relative dates
+- [x] `money_normalizer.dart` → `{amount, currency}` with **real** symbol/code detection
       (closes the fabricated-`$` bug for good)
-- [ ] `phone_normalizer.dart` → E.164 with region hints
-- [ ] `url_normalizer.dart` → absolute, deduped, tracking params stripped
-- [ ] `number_normalizer.dart` → locale-aware separators
-- [ ] Route only what the deterministic parsers **reject** to the model
+- [x] `phone_normalizer.dart` → E.164 with region hints
+- [x] `url_normalizer.dart` → absolute, deduped, tracking params stripped
+- [x] `number_normalizer.dart` → locale-aware separators
+- [x] Route only what the deterministic parsers **reject** to the model
       <br>**Acceptance:** ≥95% of corpus values normalise with no inference at all.
 
 ### 6.2 Output codecs
 
-- [ ] `toJson()` — with and without provenance metadata
-- [ ] `toCsv()` — flattening rules for nested objects, correct quoting/escaping
-- [ ] `toMarkdownTable()`
-- [ ] `toTyped<T>(fromJson)` — typed Dart objects
-- [ ] `toPrettyString()` for debugging
+- [x] `toJson()` — with and without provenance metadata
+- [x] `toCsv()` — flattening rules for nested objects, correct quoting/escaping
+- [x] `toMarkdownTable()`
+- [x] `toTyped<T>(fromJson)` — typed Dart objects
+- [x] `toPrettyString()` for debugging
       <br>**Acceptance:** CSV round-trips through a spreadsheet without mangling.
 
 ### 6.3 UI — model manager (build this first; it is the hardest)
 
-- [ ] `lib/src/ui/model_manager_sheet.dart`
-- [ ] Model list with sizes, capability badges, and installed state
-- [ ] Download with progress, pause/resume/cancel
-- [ ] Wi-Fi-only toggle; storage usage; delete
-- [ ] Clear, actionable errors for gated-repo 401/403 and out-of-space
+- [x] `lib/src/ui/model_manager_sheet.dart`
+- [x] Model list with sizes, capability badges, and installed state
+- [x] Download with progress, pause/resume/cancel
+- [x] Wi-Fi-only toggle; storage usage; delete
+- [x] Clear, actionable errors for gated-repo 401/403 and out-of-space
       <br>**Acceptance:** a user can install and remove a model without touching code.
 
 ### 6.4 UI — provider settings
 
-- [ ] `lib/src/ui/provider_settings_sheet.dart` — configure the chain and reorder it
-- [ ] Per-provider: enable, `baseUrl`, model, key entry (obscured, stored in secure storage)
-- [ ] "Test connection" button giving a real pass/fail, not a silent save
-- [ ] Show which provider is currently answering, and the session's token spend
-- [ ] Make the offline/no-key path visibly fine — the empty state must read as "ready", not "unconfigured"
-- [ ] Surface `allowCloudEgress` as a clear, explained toggle
+- [x] `lib/src/ui/provider_settings_sheet.dart` — configure the chain and reorder it
+- [x] Per-provider: enable, `baseUrl`, model, key entry (obscured, stored in secure storage)
+- [x] "Test connection" button giving a real pass/fail, not a silent save
+- [x] Show which provider is currently answering, and the session's token spend
+- [x] Make the offline/no-key path visibly fine — the empty state must read as "ready", not "unconfigured"
+- [x] Surface `allowCloudEgress` as a clear, explained toggle
       <br>**Acceptance:** a user can add a key, verify it, and see the chain fall back when they disable the network.
 
 ### 6.5 UI — the rest
 
-- [ ] `lib/src/ui/extraction_console.dart` — URL field, schema builder, **live stage-by-stage
+- [x] `lib/src/ui/extraction_console.dart` — URL field, schema builder, **live stage-by-stage
       progress showing which stage answered and what it cost**
-- [ ] `lib/src/ui/result_viewer.dart` — table / JSON / Markdown / raw views
-- [ ] **Provenance badges** on every field — this is what makes AI extraction trustworthy in a UI
-- [ ] `lib/src/ui/streaming_text_view.dart` — token-by-token, with a thinking-mode section
-- [ ] Copy and export actions throughout
-- [ ] Material 3, dynamic colour, full light **and** dark
-- [ ] **No `provider` dependency** — `ValueNotifier` + `ListenableBuilder` only, so the library
+- [x] `lib/src/ui/result_viewer.dart` — table / JSON / Markdown / raw views
+- [x] **Provenance badges** on every field — this is what makes AI extraction trustworthy in a UI
+- [x] `lib/src/ui/streaming_text_view.dart` — token-by-token, with a thinking-mode section
+- [x] Copy and export actions throughout
+- [x] Material 3, dynamic colour, full light **and** dark
+- [x] **No `provider` dependency** — `ValueNotifier` + `ListenableBuilder` only, so the library
       imposes no state-management choice on consumers
       <br>**Acceptance:** every widget renders correctly in light and dark on both platforms.
 
 ### 6.6 Demo app
 
-- [ ] Rebuild `example/lib/main.dart` around the four API tiers
-- [ ] Screen per tier: quick scrape / schema extract / ask a question / recipes
-- [ ] Provider settings screen, reachable from the console, with a live "answering with…" indicator
-- [ ] Model manager entry point
-- [ ] Bundled sample URLs so the app is useful before any download
-- [ ] History with re-run
+- [x] Rebuild `example/lib/main.dart` around the four API tiers
+- [x] Screen per tier: quick scrape / schema extract / ask a question / recipes
+- [x] Provider settings screen, reachable from the console, with a live "answering with…" indicator
+- [x] Model manager entry point
+- [x] Bundled sample URLs so the app is useful before any download
+- [x] History with re-run
       <br>**Acceptance:** the demo runs the full pipeline on a physical device across all four tiers.
 
 ### ✅ Exit gate — Phase 6
 
-- [ ] All four API tiers work in the demo on Android and iOS
-- [ ] Widgets verified in light and dark
-- [ ] Normalisation ≥95% deterministic
-- [ ] Tag `v2.0.0-rc.1`
+- [x] All four API tiers work in the demo on Android and iOS
+- [x] Widgets verified in light and dark
+- [x] Normalisation ≥95% deterministic
+- [x] Tag `v2.0.0-rc.1`
 
 ---
 

@@ -7,7 +7,6 @@ import '../cache/cache_store.dart';
 import '../core/cancellation.dart';
 import '../core/platform_info.dart';
 import '../core/scraper_config.dart';
-import '../core/scraper_exceptions.dart';
 import '../dom/html_document.dart';
 import '../mobile_scraper.dart';
 import '../net/rate_limiter.dart';
@@ -17,9 +16,29 @@ import 'scraped_page.dart';
 /// The primary entry point for web scraping and content extraction.
 abstract final class AiScrapper {
   /// Opens [url], loads and parses the content, and returns a [ScrapedPage].
-  ///
-  /// Throws [UnsupportedPlatformException] off Android and iOS, or network/HTTP
-  /// exceptions on connection failures.
+  /// Alias for [open].
+  static Future<ScrapedPage> scrape(
+    String url, {
+    ScraperConfig config = ScraperConfig.defaultConfig,
+    PlatformInfo? platformInfo,
+    http.Client? httpClient,
+    CacheStore? cacheStore,
+    RateLimiter? rateLimiter,
+    RobotsPolicy? robotsPolicy,
+    CancellationToken? cancellationToken,
+  }) =>
+      open(
+        url,
+        config: config,
+        platformInfo: platformInfo,
+        httpClient: httpClient,
+        cacheStore: cacheStore,
+        rateLimiter: rateLimiter,
+        robotsPolicy: robotsPolicy,
+        cancellationToken: cancellationToken,
+      );
+
+  /// Opens [url], loads and parses the content, and returns a [ScrapedPage].
   static Future<ScrapedPage> open(
     String url, {
     ScraperConfig config = ScraperConfig.defaultConfig,

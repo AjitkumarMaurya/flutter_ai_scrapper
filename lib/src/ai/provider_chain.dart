@@ -100,6 +100,9 @@ class ProviderChain implements AiProvider {
   /// Ordered list of candidate providers.
   final List<AiProvider> _providers;
 
+  /// Returns the ordered list of candidate providers in this chain.
+  List<AiProvider> get providers => List.unmodifiable(_providers);
+
   /// Whether sending scraped content off-device to cloud providers is allowed.
   ///
   /// Defaults to `false` for privacy. Non-local providers are skipped when `false`.

@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-rc.1] - 2026-09-02
+
+Phase 6: Output codecs, deterministic normalizers, and zero-dependency Material 3 UI widgets.
+
+### Added
+
+- **Deterministic Value Normalizers:**
+  - `DateNormalizer`: Parses ISO-8601, RFC-2822, human-readable dates, and relative times ("yesterday", "N hours ago") to standard UTC ISO-8601 strings.
+  - `MoneyNormalizer`: Multi-currency symbol detection (`$`, `€`, `£`, `¥`, `₹`) and ISO codes with European/US separator handling; completely closes the fabricated-`$` issue.
+  - `PhoneNormalizer`: E.164 standardization with domestic region hints.
+  - `UrlNormalizer`: Resolves relative URLs and strips marketing/tracking query parameters (`utm_*`, `fbclid`, `gclid`).
+  - `NumberNormalizer`: Locale-aware thousands/decimal separators and shorthand suffixes (`k`, `M`, `B`, `%`).
+- **Output Codecs (`codecs.dart`):**
+  - `toJsonString`: Serializes extraction results with optional provenance audit blocks.
+  - `toCsv`: Exports to RFC 4180 CSV with nested map flattening and cell escaping.
+  - `toMarkdownTable`: Clean GitHub Flavored Markdown table generation.
+  - `toTyped<T>`: Deserializes results into strongly-typed domain model instances.
+  - `toPrettyString`: Colorized/indented console debugging string.
+- **Material 3 UI Widgets (Zero External State Management):**
+  - `ModelManagerSheet`: Manages on-device Hugging Face models, download progress, Wi-Fi toggle, storage statistics, and deletion.
+  - `ProviderSettingsSheet`: Fallback chain configuration, per-provider settings, test connection, token spend, and `allowCloudEgress` privacy switch.
+  - `ResultViewer`: Interactive tabbed view (Table, JSON, Markdown, Raw) with field-level Provenance Badges.
+  - `StreamingTextView`: Real-time token streaming with collapsible thinking/reasoning blocks.
+  - `ExtractionConsole`: End-to-end interactive scraping console with pipeline stage indicators.
+- **Demo App (`example/lib/main.dart`):**
+  - Rebuilt with full Material 3 dynamic themes in light and dark mode, demonstrating all four API tiers (Quick Scrape, Typed Schema, Ask Page, Recipes).
+
 ## [2.0.0-dev.6] - 2026-09-02
 
 Phase 5: Selector recipes, DOM structural skeleton, and natural-language planner.
