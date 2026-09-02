@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-09-02
+
+The official 2.0 release of `flutter_ai_scrapper` — an architectural rebuild delivering an HTML5 DOM parser, zero-cost deterministic metadata harvesting, on-device Gemma & cloud AI extraction, pure-CSS site recipes, and zero-dependency Material 3 widgets.
+
+### ⚠️ Breaking Changes & Migration
+
+- **HTML5 DOM Engine:** Replaced legacy regular expression matching with an HTML5 spec-compliant DOM parser. Element extraction correctly pairs nested tags and respects true DOM hierarchies.
+- **Class Filtering:** `.select('.class')` evaluates exact class name tokens instead of substring containment.
+- **Entity Decoding:** All text nodes automatically decode HTML5 entities (e.g. `&amp;` becomes `&`).
+- **Platform Minimums:**
+  - Android: `minSdkVersion 24` (Android 7.0), `compileSdkVersion 36`.
+  - iOS: `iOS 15.0+`.
+- **API Modernization:**
+  - `MobileScraper` is `@Deprecated` in favor of `AiScrapper.open()` and `ScrapedPage`.
+  - See [`doc/MIGRATION.md`](doc/MIGRATION.md) for full migration instructions.
+
+### 🌟 Key Features Added in 2.0
+
+- **Tier 1 (Deterministic Foundation):** Zero AI tokens, <2ms execution. Full DOM querying, Readability article prose extraction, and automatic JSON-LD / Microdata / OpenGraph structured harvesting.
+- **Tier 2 (Typed Schema Extraction):** Schema-as-tool extraction with on-device Gemma models (`flutter_gemma`) or cloud fallback (`OpenAiProvider`, `AnthropicProvider`, `CustomProvider`).
+- **Tier 3 (Natural Language Asking):** `page.ask('query')` infers typed schemas and executes automated extractions.
+- **Tier 4 (Pure-CSS Selector Recipes):** `RecipeRunner` runs synthesized CSS selectors with 0 AI tokens, sub-millisecond latency, and automatic layout drift detection.
+- **Output & Codecs:** Deterministic normalizers (dates, money, phone, URL, numbers) and RFC 4180 CSV, Markdown table, and typed object codecs.
+- **Privacy & Security:** `allowCloudEgress: false` privacy gate by default, plus `KeySanitizer` API key redaction.
+- **Material 3 UI Suite:** `ModelManagerSheet`, `ProviderSettingsSheet`, `ResultViewer`, `StreamingTextView`, and `ExtractionConsole`.
+
 ## [2.0.0-rc.1] - 2026-09-02
 
 Phase 6: Output codecs, deterministic normalizers, and zero-dependency Material 3 UI widgets.

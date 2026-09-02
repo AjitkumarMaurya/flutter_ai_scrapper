@@ -49,6 +49,10 @@ enum RegexTarget {
 /// truncation and the class filter that leaked across the whole document:
 /// regex cannot pair a tag with its matching close, nor tell where an
 /// attribute ends.
+@Deprecated(
+  'Use AiScrapper.open() or AiScrapper.fromHtml() instead. '
+  'MobileScraper is retained as a compatibility shim and will be removed in 2.1.0.',
+)
 class MobileScraper {
   /// Creates a scraper for [url].
   ///
