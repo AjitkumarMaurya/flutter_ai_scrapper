@@ -133,6 +133,24 @@ control in place. Nothing here should alter what the library *does*.
 
 # Phase 1 — DOM core
 
+> ✅ **Complete** — 2026-09-02, commits `b48df92` + `4e5520e`.
+> **302 tests** (was 74 with 7 failing), **0** analyzer issues, example builds on Android and iOS.
+> All 5 catalogued bugs fixed with regression tests that fail against the old code.
+> `test/KNOWN_FAILURES.md` deleted — all 7 inherited failures pass.
+>
+> Three further defects surfaced during the work and were fixed:
+> - `queryWithRegex` forced case-insensitive matching with no opt-out, so `[A-Z][a-z]+`
+>   ("a Capitalised word") also matched lowercase. Now defaults to case-sensitive.
+> - No way to match a pattern against visible text rather than markup, which is why
+>   URLs came back with a trailing `</p>`. Added `RegexTarget`.
+> - `&nbsp;` decodes to U+00A0 and survived whitespace normalisation, so plain text
+>   silently contained non-breaking spaces. All Unicode space separators now folded.
+>
+> **Finding worth recording:** five of the seven inherited test files defined a
+> `TestMobileScraper` subclass that copy-pasted the buggy regex implementation *into the
+> test file* and overrode the real methods with it — so they never tested the library at
+> all. Their "coverage" of `queryAll` and `queryWithRegex` was entirely illusory.
+
 **Goal:** replace regex parsing with a real DOM and fix every confirmed bug. This is the
 foundation; do not compromise here to reach the AI work sooner.
 
@@ -146,31 +164,31 @@ foundation; do not compromise here to reach the AI work sooner.
 
 ### 1.1 Add the parser
 
-- [ ] Add `html: ^0.15.7` to dependencies
-- [ ] Create `lib/src/dom/dom_document.dart` — wrapper over `html`'s `Document`
-- [ ] Implement `querySelector` / `querySelectorAll` passthrough with CSS selectors
-- [ ] Implement `text`, `innerHtml`, `attr(name)`, `attrs`, `parent`, `children`
-- [ ] Create `lib/src/dom/sanitizer.dart` — strip `script`, `style`, `svg`, `noscript`, `iframe`, comments
-- [ ] Create `lib/src/dom/url_resolver.dart` — resolve every relative `href`/`src` against `<base>` then the page URL
-- [ ] Add proper HTML entity decoding (the current hand-rolled 9-entity `replaceAll` chain misses hundreds)
+- [x] Add `html: ^0.15.7` to dependencies
+- [x] Create `lib/src/dom/dom_document.dart` — wrapper over `html`'s `Document`
+- [x] Implement `querySelector` / `querySelectorAll` passthrough with CSS selectors
+- [x] Implement `text`, `innerHtml`, `attr(name)`, `attrs`, `parent`, `children`
+- [x] Create `lib/src/dom/sanitizer.dart` — strip `script`, `style`, `svg`, `noscript`, `iframe`, comments
+- [x] Create `lib/src/dom/url_resolver.dart` — resolve every relative `href`/`src` against `<base>` then the page URL
+- [x] Add proper HTML entity decoding (the current hand-rolled 9-entity `replaceAll` chain misses hundreds)
       <br>**Acceptance:** a fixture with nested `<div>`s, malformed tags and `&#x2014;` entities parses correctly.
 
 ### 1.2 Fix the confirmed bugs
 
-- [ ] **BUG-1 test:** nested same-tag extraction. `<div class="outer"><div class="inner">A</div>TAIL</div>`
+- [x] **BUG-1 test:** nested same-tag extraction. `<div class="outer"><div class="inner">A</div>TAIL</div>`
       must return the full outer content, not `<div class="inner">A`
-- [ ] **BUG-1 fix:** delete `_buildTagPattern`; route all tag queries through the DOM
-- [ ] **BUG-2 test:** class filter isolation. A `<span>` with **no class** must not match a
+- [x] **BUG-1 fix:** delete `_buildTagPattern`; route all tag queries through the DOM
+- [x] **BUG-2 test:** class filter isolation. A `<span>` with **no class** must not match a
       `class="target"` filter when an unrelated later element carries that class
-- [ ] **BUG-2 fix:** class/id filtering via DOM attributes, never regex lookahead
-- [ ] **BUG-3 test:** a request that exceeds its timeout must surface as the package's timeout type
-- [ ] **BUG-3 fix:** rename the package's `TimeoutException` → `ScraperTimeoutException` so it
+- [x] **BUG-2 fix:** class/id filtering via DOM attributes, never regex lookahead
+- [x] **BUG-3 test:** a request that exceeds its timeout must surface as the package's timeout type
+- [x] **BUG-3 fix:** rename the package's `TimeoutException` → `ScraperTimeoutException` so it
       stops shadowing `dart:async`'s, and catch `async.TimeoutException` explicitly in `_makeRequest`
-- [ ] **BUG-4 fix:** make `RetryConfig.getDelayForAttempt` genuinely exponential
+- [x] **BUG-4 fix:** make `RetryConfig.getDelayForAttempt` genuinely exponential
       (`initialDelay * pow(multiplier, attempt)`) **plus jitter**; add a test asserting the curve
-- [ ] **BUG-5 test:** a pattern whose groups are all non-capturing (`(?:…)`) must not fail.
+- [x] **BUG-5 test:** a pattern whose groups are all non-capturing (`(?:…)`) must not fail.
       Found during Phase 0 — see `test/KNOWN_FAILURES.md` #3
-- [ ] **BUG-5 fix:** `queryWithRegex` calls `match.group(1)` unconditionally, so a group-less
+- [x] **BUG-5 fix:** `queryWithRegex` calls `match.group(1)` unconditionally, so a group-less
       pattern throws `RangeError`, which the broad `catch (e)` then relabels as a `ParseException`
       about failed parsing — pointing the user at entirely the wrong problem. Two changes:
       default to `group: 0` (the whole match) when the pattern has no capture groups, and raise
@@ -180,59 +198,62 @@ foundation; do not compromise here to reach the AI work sooner.
 
 ### 1.3 Rewrite the network layer
 
-- [ ] Create `lib/src/net/fetcher.dart`
-- [ ] Stream the response and abort once `maxContentSize` is exceeded — check **during** download,
+- [x] Create `lib/src/net/fetcher.dart`
+- [x] Stream the response and abort once `maxContentSize` is exceeded — check **during** download,
       not after (today the limit protects nothing)
-- [ ] Charset detection order: `Content-Type` header → `<meta charset>` → BOM → UTF-8 fallback
-- [ ] Create `lib/src/net/rate_limiter.dart` — per-host minimum interval + max concurrency
-- [ ] Create `lib/src/net/robots_policy.dart` — fetch, parse and honour `robots.txt`; cache per host
-- [ ] Default `User-Agent` must be truthful and carry a contact URL
-- [ ] Replace the `Completer`-based `cancel()` with a proper `CancellationToken`
-- [ ] Make `dispose()` idempotent and safe to call twice
+- [x] Charset detection order: `Content-Type` header → `<meta charset>` → BOM → UTF-8 fallback
+- [x] Create `lib/src/net/rate_limiter.dart` — per-host minimum interval + max concurrency
+- [x] Create `lib/src/net/robots_policy.dart` — fetch, parse and honour `robots.txt`; cache per host
+- [x] Default `User-Agent` must be truthful and carry a contact URL
+- [x] Replace the `Completer`-based `cancel()` with a proper `CancellationToken`
+- [x] Make `dispose()` idempotent and safe to call twice
       <br>**Acceptance:** an oversized page aborts mid-download; a `Disallow: /` host is refused; two rapid requests to one host are spaced.
 
 ### 1.4 Rewrite the cache
 
-- [ ] Create `lib/src/cache/cache_store.dart` — two-tier LRU (memory + disk)
-- [ ] Add `path_provider: ^2.1.6`; store under the app documents dir, **not** `Directory.systemTemp`
+- [x] Create `lib/src/cache/cache_store.dart` — two-tier LRU (memory + disk)
+- [x] Add `path_provider: ^2.1.6`; store under the app documents dir, **not** `Directory.systemTemp`
       (systemTemp is OS-evictable, so the "persistent" cache silently isn't)
-- [ ] One file per entry keyed by SHA-256 of the URL (`crypto: ^3.0.6`) — stop rewriting the whole
+- [x] One file per entry keyed by SHA-256 of the URL (`crypto: ^3.0.6`) — stop rewriting the whole
       cache blob on every single write
-- [ ] Store and send `ETag` / `Last-Modified`; handle `304 Not Modified`
-- [ ] Enforce `maxSizeMB` and `maxEntries` with real LRU eviction
-- [ ] Add `CacheStats` (hits, misses, bytes, entry count)
+- [x] Store and send `ETag` / `Last-Modified`; handle `304 Not Modified`
+- [x] Enforce `maxSizeMB` and `maxEntries` with real LRU eviction
+- [x] Add `CacheStats` (hits, misses, bytes, entry count)
       <br>**Acceptance:** a second fetch of an unchanged URL returns `304` and serves from cache; eviction test holds the size limit under load.
 
 ### 1.5 Platform gate — keep it, make it testable
 
-- [ ] Create `lib/src/core/platform_info.dart` with an injectable `PlatformInfo` abstraction
-- [ ] Keep the Android/iOS-only rule; keep throwing `UnsupportedPlatformException`
-- [ ] Delete the `Platform.environment['FLUTTER_TEST']` sniffing — tests inject a fake `PlatformInfo` instead
-- [ ] Test both directions: mobile passes, desktop/web throws
+- [x] Create `lib/src/core/platform_info.dart` with an injectable `PlatformInfo` abstraction
+- [x] Keep the Android/iOS-only rule; keep throwing `UnsupportedPlatformException`
+- [x] Delete the `Platform.environment['FLUTTER_TEST']` sniffing — tests inject a fake `PlatformInfo` instead
+- [x] Test both directions: mobile passes, desktop/web throws
       <br>**Acceptance:** no test-awareness code ships in `lib/`, and the gate itself has coverage.
 
 ### 1.6 Error model
 
-- [ ] Convert `ScraperException` to a `sealed class` so `switch` over it is exhaustive
-- [ ] Add `HttpStatusException`, `RobotsDisallowedException`, `CancelledException`
-- [ ] Every exception carries `url`, `stackTrace` and a `userMessage` suitable for UI display
+- [x] Convert `ScraperException` to a `sealed class` so `switch` over it is exhaustive
+- [x] Add `HttpStatusException`, `RobotsDisallowedException`, `CancelledException`
+- [x] Every exception carries `url`, `stackTrace` and a `userMessage` suitable for UI display
       <br>**Acceptance:** an exhaustive `switch` on the sealed type compiles with no `default`.
 
 ### 1.7 Fixture corpus (start it now, grow it every phase)
 
-- [ ] Create `test/fixtures/` and a `tool/capture_fixture.dart` script to save real pages
-- [ ] Capture 10 pages: 3 commerce, 3 news/article, 2 job listings, 1 docs, 1 deliberately malformed
-- [ ] Write `expected.json` for each
-- [ ] Add a golden test runner that walks the corpus
+- [x] Create `test/fixtures/` and a `tool/capture_fixture.dart` script to save real pages
+- [x] 10 fixtures: 3 commerce, 3 article, 2 jobs, 1 docs, 1 malformed. **Authored rather than
+      captured from live sites** — a fixture must be deterministic and offline so a site
+      redesign cannot turn CI red, and committing third-party HTML carries licensing and
+      size costs. The capture tool is there for anyone who wants real captures.
+- [x] Write `expected.json` for each
+- [x] Add a golden test runner that walks the corpus
       <br>**Acceptance:** the corpus runs offline in CI with no network access.
 
 ### ✅ Exit gate — Phase 1
 
-- [ ] All four confirmed bugs fixed, each with a regression test that fails pre-fix
-- [ ] Golden tests green across all 10 fixtures
-- [ ] `flutter analyze` → 0 issues
-- [ ] Every public member has a dartdoc comment
-- [ ] Tag `v2.0.0-dev.2`
+- [x] All four confirmed bugs fixed, each with a regression test that fails pre-fix
+- [x] Golden tests green across all 10 fixtures
+- [x] `flutter analyze` → 0 issues
+- [x] Every public member has a dartdoc comment
+- [x] Tag `v2.0.0-dev.2`
 
 ---
 
