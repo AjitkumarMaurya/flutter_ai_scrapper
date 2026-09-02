@@ -6,16 +6,16 @@ import '../ai/model_manager.dart';
 /// Modal bottom sheet or dialog allowing users to manage on-device LLM models.
 class ModelManagerSheet extends StatefulWidget {
   /// Creates a [ModelManagerSheet].
-  const ModelManagerSheet({super.key, required this.manager});
+  const ModelManagerSheet({
+    super.key,
+    required this.manager,
+  });
 
   /// The underlying [ModelManager] instance.
   final ModelManager manager;
 
   /// Convenience method to show this sheet modally.
-  static Future<void> show(
-    BuildContext context, {
-    required ModelManager manager,
-  }) {
+  static Future<void> show(BuildContext context, {required ModelManager manager}) {
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -29,7 +29,9 @@ class ModelManagerSheet extends StatefulWidget {
 }
 
 class _ModelManagerSheetState extends State<ModelManagerSheet> {
+  final TextEditingController _hfTokenController = TextEditingController();
   bool _wifiOnly = true;
+  bool _showTokenInput = false;
   String? _errorMessage;
   String? _downloadingRepo;
   double _downloadProgress = 0.0;
@@ -42,17 +44,26 @@ class _ModelManagerSheetState extends State<ModelManagerSheet> {
     _refreshStorage();
   }
 
+  @override
+  void dispose() {
+    _hfTokenController.dispose();
+    super.dispose();
+  }
+
   Future<void> _refreshStorage() async {
     try {
       final info = await widget.manager.getStorageInfo();
       final installed = await widget.manager.listInstalledModels();
+      debugPrint('DEBUG _refreshStorage installed: $installed');
       if (mounted) {
         setState(() {
           _storageInfo = info;
           _installedRepos = installed.toSet();
         });
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('DEBUG _refreshStorage error: $e');
+    }
   }
 
   Future<void> _download(GemmaModelSpec model) async {
@@ -62,9 +73,14 @@ class _ModelManagerSheetState extends State<ModelManagerSheet> {
       _errorMessage = null;
     });
 
+    final token = _hfTokenController.text.trim().isEmpty
+        ? null
+        : _hfTokenController.text.trim();
+
     try {
       await widget.manager.install(
         model,
+        token: token,
         onProgress: (p) {
           if (mounted) {
             setState(() => _downloadProgress = p);
@@ -85,6 +101,9 @@ class _ModelManagerSheetState extends State<ModelManagerSheet> {
 
   Future<void> _delete(GemmaModelSpec model) async {
     try {
+      if (model.file != null) {
+        await widget.manager.uninstallModel(model.file!);
+      }
       await widget.manager.uninstallModel(model.repo);
       await _refreshStorage();
     } catch (e) {
@@ -99,9 +118,6 @@ class _ModelManagerSheetState extends State<ModelManagerSheet> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    // Material, not a decorated Container: ListTile paints its background and
-    // ink splashes onto the nearest Material ancestor, and a DecoratedBox with
-    // a colour in between hides them. Flutter warns about exactly this.
     return Material(
       color: colorScheme.surface,
       borderRadius: const BorderRadius.vertical(top: Radius.circular(24.0)),
@@ -116,8 +132,6 @@ class _ModelManagerSheetState extends State<ModelManagerSheet> {
               children: [
                 Icon(Icons.memory, color: colorScheme.primary),
                 const SizedBox(width: 12.0),
-
-                // Expanded so a long title cannot push the close button off-screen.
                 Expanded(
                   child: Text(
                     'On-Device Models',
@@ -125,6 +139,11 @@ class _ModelManagerSheetState extends State<ModelManagerSheet> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
+                ),
+                IconButton(
+                  icon: Icon(_showTokenInput ? Icons.vpn_key : Icons.vpn_key_outlined),
+                  tooltip: 'Hugging Face Token',
+                  onPressed: () => setState(() => _showTokenInput = !_showTokenInput),
                 ),
                 IconButton(
                   icon: const Icon(Icons.close),
@@ -144,11 +163,26 @@ class _ModelManagerSheetState extends State<ModelManagerSheet> {
                 ),
               ),
             SwitchListTile(
+              contentPadding: EdgeInsets.zero,
               dense: true,
               title: const Text('Download on Wi-Fi only'),
               value: _wifiOnly,
               onChanged: (val) => setState(() => _wifiOnly = val),
             ),
+            if (_showTokenInput)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: TextField(
+                  controller: _hfTokenController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    labelText: 'Hugging Face Access Token (Optional)',
+                    hintText: 'hf_...',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ),
             if (_errorMessage != null) ...[
               Container(
                 padding: const EdgeInsets.all(12.0),
@@ -158,13 +192,14 @@ class _ModelManagerSheetState extends State<ModelManagerSheet> {
                   borderRadius: BorderRadius.circular(12.0),
                 ),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Icon(Icons.error_outline, color: colorScheme.error),
                     const SizedBox(width: 8.0),
                     Expanded(
-                      child: Text(
+                      child: SelectableText(
                         _errorMessage!,
-                        style: TextStyle(color: colorScheme.onErrorContainer),
+                        style: TextStyle(color: colorScheme.onErrorContainer, fontSize: 13),
                       ),
                     ),
                   ],
@@ -178,19 +213,19 @@ class _ModelManagerSheetState extends State<ModelManagerSheet> {
                 children: [
                   _buildModelTile(
                     GemmaModels.gemma31b,
-                    'Default on-device generalist',
+                    'Default on-device generalist (~550 MB)',
                   ),
                   _buildModelTile(
                     GemmaModels.functionGemma270m,
-                    'Ultra-light 270M function specialist',
+                    'Ultra-light 270M function specialist (~300 MB)',
                   ),
                   _buildModelTile(
                     GemmaModels.qwen306b,
-                    'Multilingual 600M extractor',
+                    'Multilingual 600M extractor (~400 MB)',
                   ),
                   _buildModelTile(
                     GemmaModels.gemma4E2b,
-                    'High precision 2B edge model',
+                    'High precision 2B edge model (~2.4 GB)',
                   ),
                 ],
               ),
@@ -202,14 +237,13 @@ class _ModelManagerSheetState extends State<ModelManagerSheet> {
   }
 
   Widget _buildModelTile(GemmaModelSpec model, String subtitle) {
-    final isInstalled = _installedRepos.contains(model.repo);
+    final isInstalled = _installedRepos.contains(model.repo) ||
+        (model.file != null && _installedRepos.contains(model.file)) ||
+        _installedRepos.any((r) => model.file != null && r.endsWith(model.file!));
     final isDownloading = _downloadingRepo == model.repo;
 
     return Card(
       elevation: 0,
-      // An explicit colour and matching clip: without them Flutter warns that
-      // the ListTile's background and ink splashes may be invisible, because
-      // the tile's rounded corners do not line up with the card's.
       color: Theme.of(context).colorScheme.surface,
       clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(
@@ -218,11 +252,6 @@ class _ModelManagerSheetState extends State<ModelManagerSheet> {
       ),
       margin: const EdgeInsets.symmetric(vertical: 6.0),
       child: ListTile(
-        // Wrap, not Row: a ListTile's title is already narrowed by the
-        // trailing Install button, and a long name beside a size chip
-        // overflowed by up to 105px on a 360dp device. Wrap drops the chip
-        // below the name instead — the download size is exactly the number a
-        // user needs before committing to it, so it must not be clipped.
         title: Wrap(
           spacing: 8.0,
           runSpacing: 4.0,
@@ -242,9 +271,19 @@ class _ModelManagerSheetState extends State<ModelManagerSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(subtitle),
+            const SizedBox(height: 2.0),
+            Text(
+              '${model.repo} • ${model.file ?? "manifest"}',
+              style: TextStyle(
+                fontSize: 11,
+                color: Theme.of(context).colorScheme.outline,
+                fontFamily: 'monospace',
+              ),
+            ),
             if (isDownloading) ...[
               const SizedBox(height: 8.0),
               LinearProgressIndicator(value: _downloadProgress),
+              const SizedBox(height: 4.0),
               Text('${(_downloadProgress * 100).toStringAsFixed(1)}%'),
             ],
           ],
@@ -256,16 +295,16 @@ class _ModelManagerSheetState extends State<ModelManagerSheet> {
                 onPressed: () => _delete(model),
               )
             : isDownloading
-            ? const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : ElevatedButton.icon(
-                icon: const Icon(Icons.download),
-                label: const Text('Install'),
-                onPressed: () => _download(model),
-              ),
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : ElevatedButton.icon(
+                    icon: const Icon(Icons.download),
+                    label: const Text('Install'),
+                    onPressed: () => _download(model),
+                  ),
       ),
     );
   }

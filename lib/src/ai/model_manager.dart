@@ -9,6 +9,7 @@ class GemmaModelSpec {
   const GemmaModelSpec({
     required this.name,
     required this.repo,
+    this.file,
     required this.modelType,
     required this.fileType,
     required this.sizeBytes,
@@ -22,6 +23,9 @@ class GemmaModelSpec {
 
   /// Hugging Face repository identifier.
   final String repo;
+
+  /// Specific model file inside the repository (e.g. `model.litertlm`).
+  final String? file;
 
   /// Supported model family architecture.
   final ModelType modelType;
@@ -52,7 +56,8 @@ abstract final class GemmaModels {
   /// Gemma 3 1B — the recommended default extraction model.
   static const gemma31b = GemmaModelSpec(
     name: 'Gemma 3 1B',
-    repo: 'google/gemma-3-1b-it',
+    repo: 'litert-community/Gemma3-1B-IT',
+    file: 'gemma3-1b-it-int4.litertlm',
     modelType: ModelType.gemmaIt,
     fileType: ModelFileType.litertlm,
     sizeBytes: 550 * 1024 * 1024,
@@ -64,7 +69,8 @@ abstract final class GemmaModels {
   /// FunctionGemma 270M — lightest viable model with native function calling.
   static const functionGemma270m = GemmaModelSpec(
     name: 'FunctionGemma 270M',
-    repo: 'google/function-gemma-270m-it',
+    repo: 'litert-community/functiongemma-270m-ft-mobile-actions',
+    file: 'mobile_actions_q8_ekv1024.litertlm',
     modelType: ModelType.functionGemma,
     fileType: ModelFileType.litertlm,
     sizeBytes: 300 * 1024 * 1024,
@@ -75,7 +81,8 @@ abstract final class GemmaModels {
   /// Qwen3 0.6B — optimized for low-RAM mobile devices.
   static const qwen306b = GemmaModelSpec(
     name: 'Qwen3 0.6B',
-    repo: 'Qwen/Qwen2.5-0.5B-Instruct',
+    repo: 'litert-community/Qwen3-0.6B',
+    file: 'Qwen3-0.6B.litertlm',
     modelType: ModelType.qwen3,
     fileType: ModelFileType.litertlm,
     sizeBytes: 400 * 1024 * 1024,
@@ -86,7 +93,8 @@ abstract final class GemmaModels {
   /// Gemma 4 E2B — quality tier model with native function-calling tokens.
   static const gemma4E2b = GemmaModelSpec(
     name: 'Gemma 4 E2B',
-    repo: 'google/gemma-4-e2b-it',
+    repo: 'litert-community/gemma-4-E2B-it-litert-lm',
+    file: 'gemma-4-E2B-it.litertlm',
     modelType: ModelType.gemma4,
     fileType: ModelFileType.litertlm,
     sizeBytes: 2400 * 1024 * 1024,
@@ -137,7 +145,11 @@ class ModelManager {
         modelType: spec.modelType,
         fileType: spec.fileType,
       )
-          .fromHuggingFace(spec.repo)
+          .fromHuggingFace(
+            spec.repo,
+            file: spec.file,
+            token: token,
+          )
           .withProgress((progress) => onProgress?.call(progress / 100.0))
           .install();
     } catch (e) {
@@ -148,6 +160,7 @@ class ModelManager {
   /// Installs an arbitrary model from a Hugging Face repository.
   Future<void> installFromHuggingFace(
     String repo, {
+    String? file,
     ModelType modelType = ModelType.gemmaIt,
     ModelFileType fileType = ModelFileType.litertlm,
     String? token,
@@ -158,7 +171,11 @@ class ModelManager {
         modelType: modelType,
         fileType: fileType,
       )
-          .fromHuggingFace(repo)
+          .fromHuggingFace(
+            repo,
+            file: file,
+            token: token,
+          )
           .withProgress((progress) => onProgress?.call(progress / 100.0))
           .install();
     } catch (e) {
