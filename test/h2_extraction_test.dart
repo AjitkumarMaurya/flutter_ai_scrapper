@@ -84,11 +84,10 @@ void main() {
     </html>
     ''';
 
-    late TestMobileScraper scraper;
+    late MobileScraper scraper;
 
     setUp(() {
-      scraper = TestMobileScraper(
-          'https://test-castingdoor.com', castingDoorLikeHtml);
+      scraper = MobileScraper.fromHtml(castingDoorLikeHtml, url: 'https://test-castingdoor.com');
     });
 
     test('should extract all H2 tags from castingdoor-like structure', () {
@@ -124,7 +123,7 @@ void main() {
       ''';
 
       final classBasedScraper =
-          TestMobileScraper('https://test.com', htmlWithClasses);
+          MobileScraper.fromHtml(htmlWithClasses, url: 'https://test.com');
       final sectionTitles =
           classBasedScraper.queryAll(tag: 'h2', className: 'section-title');
 
@@ -134,7 +133,10 @@ void main() {
         print('  • "$title"');
       }
 
-      expect(sectionTitles.length, equals(3));
+      // The fixture contains exactly two <h2 class="section-title">. 1.x
+      // reported three because its class lookahead scanned the rest of the
+      // document (BUG-2) and matched an h2 that did not carry the class.
+      expect(sectionTitles.length, equals(2));
       expect(sectionTitles, contains('Main Categories'));
       expect(sectionTitles, contains('Sub Categories'));
     });
@@ -204,159 +206,4 @@ void main() {
       expect(readingTime.inSeconds, greaterThan(0));
     });
   });
-}
-
-/// Test helper class for simulating mobile scraper functionality
-class TestMobileScraper extends MobileScraper {
-  TestMobileScraper(String url, String htmlContent) : super(url: url) {
-    _htmlContent = htmlContent;
-  }
-
-  String? _htmlContent;
-
-  @override
-  String? get rawHtml => _htmlContent;
-
-  @override
-  bool get isLoaded => _htmlContent != null;
-
-  @override
-  List<String> queryAll({
-    required String tag,
-    String? className,
-    String? id,
-  }) {
-    if (_htmlContent == null) {
-      throw ScraperNotInitializedException();
-    }
-
-    try {
-      List<String> results = [];
-      String pattern = _buildTagPattern(tag, className: className, id: id);
-
-      RegExp regex = RegExp(pattern, caseSensitive: false, dotAll: true);
-      Iterable<RegExpMatch> matches = regex.allMatches(_htmlContent!);
-
-      for (RegExpMatch match in matches) {
-        String? content = match.group(1);
-        if (content != null) {
-          String cleanContent = _cleanHtmlContent(content);
-          if (cleanContent.isNotEmpty) {
-            results.add(cleanContent);
-          }
-        }
-      }
-
-      return results;
-    } catch (e) {
-      throw ParseException(
-          'Failed to parse HTML with tag pattern', _htmlContent, e);
-    }
-  }
-
-  @override
-  List<String> queryWithRegex({
-    required String pattern,
-    int group = 1,
-  }) {
-    if (_htmlContent == null) {
-      throw ScraperNotInitializedException();
-    }
-
-    try {
-      List<String> results = [];
-      RegExp regex = RegExp(pattern, caseSensitive: false, dotAll: true);
-      Iterable<RegExpMatch> matches = regex.allMatches(_htmlContent!);
-
-      for (RegExpMatch match in matches) {
-        String? content = match.group(group);
-        if (content != null) {
-          String cleanContent = content.trim();
-          if (cleanContent.isNotEmpty) {
-            results.add(cleanContent);
-          }
-        }
-      }
-
-      return results;
-    } catch (e) {
-      throw ParseException(
-          'Failed to parse HTML with regex pattern: $pattern', _htmlContent, e);
-    }
-  }
-
-  @override
-  SmartContent extractSmartContent() {
-    if (_htmlContent == null) {
-      throw ScraperNotInitializedException();
-    }
-    return SmartExtractor.extractAll(_htmlContent!);
-  }
-
-  @override
-  String toMarkdown() {
-    if (_htmlContent == null) {
-      throw ScraperNotInitializedException();
-    }
-    return ContentFormatter.toMarkdown(_htmlContent!);
-  }
-
-  @override
-  String toPlainText() {
-    if (_htmlContent == null) {
-      throw ScraperNotInitializedException();
-    }
-    return ContentFormatter.toPlainText(_htmlContent!);
-  }
-
-  @override
-  int getWordCount() {
-    final plainText = toPlainText();
-    return ContentFormatter.wordCount(plainText);
-  }
-
-  @override
-  Duration estimateReadingTime({int wordsPerMinute = 200}) {
-    final plainText = toPlainText();
-    return ContentFormatter.estimateReadingTime(plainText,
-        wordsPerMinute: wordsPerMinute);
-  }
-
-  // Private helper methods
-  String _buildTagPattern(String tag, {String? className, String? id}) {
-    String attributePattern = '';
-
-    if (className != null) {
-      attributePattern +=
-          '(?=.*class=["\'](?:[^"\']*\\s)?${RegExp.escape(className)}(?:\\s[^"\']*)?["\'])';
-    }
-
-    if (id != null) {
-      attributePattern += '(?=.*id=["\']${RegExp.escape(id)}["\'])';
-    }
-
-    return '<${RegExp.escape(tag)}$attributePattern[^>]*>(.*?)<\\/${RegExp.escape(tag)}>';
-  }
-
-  String _cleanHtmlContent(String content) {
-    // Remove HTML tags
-    String cleaned = content.replaceAll(RegExp(r'<[^>]*>'), '');
-
-    // Decode common HTML entities
-    cleaned = cleaned
-        .replaceAll('&amp;', '&')
-        .replaceAll('&lt;', '<')
-        .replaceAll('&gt;', '>')
-        .replaceAll('&quot;', '"')
-        .replaceAll('&#39;', "'")
-        .replaceAll('&nbsp;', ' ')
-        .replaceAll('&copy;', '©')
-        .replaceAll('&reg;', '®')
-        .replaceAll('&trade;', '™');
-
-    // Clean up whitespace
-    cleaned = cleaned.replaceAll(RegExp(r'\s+'), ' ').trim();
-
-    return cleaned;
-  }
 }

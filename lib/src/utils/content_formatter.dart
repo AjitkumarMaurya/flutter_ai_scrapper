@@ -1,519 +1,392 @@
-/// Content formatting and cleaning utilities
-library;
+import 'package:html/dom.dart' as dom;
 
-/// Content formatting options
+import '../dom/html_document.dart';
+
+/// Output shapes [ContentFormatter] can produce.
 enum ContentFormat {
-  /// Clean text with minimal formatting
+  /// Readable text with block structure preserved as newlines.
   plainText,
 
-  /// Markdown formatted text
+  /// Markdown, keeping headings, lists, tables, links and emphasis.
   markdown,
 
-  /// HTML with cleaned structure
-  cleanHtml,
-
-  /// Readable content (like Readability.js)
+  /// The main article body as text, with page chrome removed.
   readable,
 }
 
-/// Content formatter that provides clean, formatted text from HTML
-class ContentFormatter {
-  /// Format content according to the specified format
-  static String format(String html, ContentFormat format) {
-    switch (format) {
-      case ContentFormat.plainText:
-        return toPlainText(html);
-      case ContentFormat.markdown:
-        return toMarkdown(html);
-      case ContentFormat.cleanHtml:
-        return toCleanHtml(html);
-      case ContentFormat.readable:
-        return toReadableContent(html);
+/// A table lifted out of a page.
+class ExtractedTable {
+  /// Creates a table.
+  const ExtractedTable({required this.headers, required this.rows});
+
+  /// Header cells, empty when the table has no header row.
+  final List<String> headers;
+
+  /// Body rows.
+  final List<List<String>> rows;
+
+  /// Whether the table carried a header row.
+  bool get hasHeaders => headers.isNotEmpty;
+
+  /// This table as a GitHub-flavoured Markdown table.
+  String toMarkdown() {
+    if (headers.isEmpty && rows.isEmpty) return '';
+
+    final columnCount = headers.isNotEmpty
+        ? headers.length
+        : rows.fold(0, (max, row) => row.length > max ? row.length : max);
+    if (columnCount == 0) return '';
+
+    final effectiveHeaders = headers.isNotEmpty
+        ? headers
+        : List.filled(columnCount, '');
+
+    final buffer = StringBuffer()
+      ..writeln('| ${effectiveHeaders.map(_escapeCell).join(' | ')} |')
+      ..writeln('|${List.filled(columnCount, ' --- ').join('|')}|');
+
+    for (final row in rows) {
+      final padded = [
+        ...row.take(columnCount),
+        ...List.filled(
+          columnCount > row.length ? columnCount - row.length : 0,
+          '',
+        ),
+      ];
+      buffer.writeln('| ${padded.map(_escapeCell).join(' | ')} |');
     }
+
+    return buffer.toString().trimRight();
   }
 
-  /// Convert HTML to clean plain text
-  static String toPlainText(String html) {
-    // Remove script and style tags completely
-    String cleaned = html.replaceAll(
-        RegExp(r'<(script|style)[^>]*>.*?</\1>',
-            caseSensitive: false, dotAll: true),
-        '');
+  static String _escapeCell(String value) =>
+      value.replaceAll('|', r'\|').replaceAll('\n', ' ');
 
-    // Convert common HTML elements to plain text equivalents
-    cleaned = cleaned
-        // Line breaks for block elements
-        .replaceAll(
-            RegExp(r'</(div|p|h[1-6]|li|br)>', caseSensitive: false), '\n')
-        .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n')
-        // Double line breaks for paragraphs and headers
-        .replaceAll(RegExp(r'</(p|h[1-6])>', caseSensitive: false), '\n\n')
-        // List items
-        .replaceAll(RegExp(r'<li[^>]*>', caseSensitive: false), '• ')
-        // Remove all remaining HTML tags
-        .replaceAll(RegExp(r'<[^>]*>'), '');
+  @override
+  String toString() => 'ExtractedTable(${headers.length} cols, '
+      '${rows.length} rows)';
+}
 
-    return _cleanText(cleaned);
+/// Turns a parsed page into text, Markdown or a readable article.
+///
+/// Every method walks the DOM. The 1.x formatter chained dozens of
+/// `replaceAll(RegExp(...))` calls over raw HTML, which mangled nested lists,
+/// flattened tables into pipe soup, and — because it stripped tags before
+/// decoding entities — left `&amp;` sequences scattered through its output.
+abstract final class ContentFormatter {
+  /// Formats [document] as [format].
+  static String format(HtmlDocument document, ContentFormat format) =>
+      switch (format) {
+        ContentFormat.plainText => toPlainText(document),
+        ContentFormat.markdown => toMarkdown(document),
+        ContentFormat.readable => toReadableContent(document),
+      };
+
+  /// The page as readable text, with block structure kept as newlines.
+  ///
+  /// Sanitizes first, so script and style bodies never reach the output.
+  static String toPlainText(HtmlDocument document) {
+    final body = _sanitizedCopy(document).body;
+    return body?.blockText ?? '';
   }
 
-  /// Convert HTML to Markdown format
-  static String toMarkdown(String html) {
-    String markdown = html;
+  /// The page as Markdown.
+  ///
+  /// Headings, paragraphs, lists (including nesting), links, images, emphasis,
+  /// code, blockquotes, horizontal rules and tables are all preserved.
+  static String toMarkdown(HtmlDocument document) {
+    final body = _sanitizedCopy(document).body;
+    if (body == null) return '';
 
-    // Remove script and style tags
-    markdown = markdown.replaceAll(
-        RegExp(r'<(script|style)[^>]*>.*?</\1>',
-            caseSensitive: false, dotAll: true),
-        '');
+    final buffer = StringBuffer();
+    _writeMarkdown(body.raw, buffer, document.baseUrl);
 
-    // Convert headers
-    markdown = markdown.replaceAllMapped(
-      RegExp(r'<h1[^>]*>(.*?)</h1>', caseSensitive: false, dotAll: true),
-      (match) => '# ${match.group(1)}\n\n',
-    );
-    markdown = markdown.replaceAllMapped(
-      RegExp(r'<h2[^>]*>(.*?)</h2>', caseSensitive: false, dotAll: true),
-      (match) => '## ${match.group(1)}\n\n',
-    );
-    markdown = markdown.replaceAllMapped(
-      RegExp(r'<h3[^>]*>(.*?)</h3>', caseSensitive: false, dotAll: true),
-      (match) => '### ${match.group(1)}\n\n',
-    );
-    markdown = markdown.replaceAllMapped(
-      RegExp(r'<h4[^>]*>(.*?)</h4>', caseSensitive: false, dotAll: true),
-      (match) => '#### ${match.group(1)}\n\n',
-    );
-    markdown = markdown.replaceAllMapped(
-      RegExp(r'<h5[^>]*>(.*?)</h5>', caseSensitive: false, dotAll: true),
-      (match) => '##### ${match.group(1)}\n\n',
-    );
-    markdown = markdown.replaceAllMapped(
-      RegExp(r'<h6[^>]*>(.*?)</h6>', caseSensitive: false, dotAll: true),
-      (match) => '###### ${match.group(1)}\n\n',
-    );
-
-    // Convert text formatting
-    markdown = markdown.replaceAllMapped(
-      RegExp(r'<strong[^>]*>(.*?)</strong>',
-          caseSensitive: false, dotAll: true),
-      (match) => '**${match.group(1)}**',
-    );
-    markdown = markdown.replaceAllMapped(
-      RegExp(r'<b[^>]*>(.*?)</b>', caseSensitive: false, dotAll: true),
-      (match) => '**${match.group(1)}**',
-    );
-    markdown = markdown.replaceAllMapped(
-      RegExp(r'<em[^>]*>(.*?)</em>', caseSensitive: false, dotAll: true),
-      (match) => '*${match.group(1)}*',
-    );
-    markdown = markdown.replaceAllMapped(
-      RegExp(r'<i[^>]*>(.*?)</i>', caseSensitive: false, dotAll: true),
-      (match) => '*${match.group(1)}*',
-    );
-    markdown = markdown.replaceAllMapped(
-      RegExp(r'<code[^>]*>(.*?)</code>', caseSensitive: false, dotAll: true),
-      (match) => '`${match.group(1)}`',
-    );
-
-    // Convert links
-    markdown = markdown.replaceAllMapped(
-      RegExp(r'<a[^>]*href=[\"\x27]([^\"\x27]*)[\"\x27][^>]*>(.*?)</a>',
-          caseSensitive: false, dotAll: true),
-      (match) => '[${match.group(2)}](${match.group(1)})',
-    );
-
-    // Convert images
-    markdown = markdown.replaceAllMapped(
-      RegExp(
-          r'<img[^>]*src=[\"\x27]([^\"\x27]*)[\"\x27][^>]*alt=[\"\x27]([^\"\x27]*)[\"\x27][^>]*/?>',
-          caseSensitive: false),
-      (match) => '![${match.group(2)}](${match.group(1)})',
-    );
-
-    // Convert lists
-    markdown = markdown
-        .replaceAll(RegExp(r'<ul[^>]*>', caseSensitive: false), '')
-        .replaceAll(RegExp(r'</ul>', caseSensitive: false), '\n')
-        .replaceAll(RegExp(r'<ol[^>]*>', caseSensitive: false), '')
-        .replaceAll(RegExp(r'</ol>', caseSensitive: false), '\n');
-    markdown = markdown.replaceAllMapped(
-      RegExp(r'<li[^>]*>(.*?)</li>', caseSensitive: false, dotAll: true),
-      (match) => '- ${match.group(1)}\n',
-    );
-
-    // Convert paragraphs
-    markdown = markdown.replaceAllMapped(
-      RegExp(r'<p[^>]*>(.*?)</p>', caseSensitive: false, dotAll: true),
-      (match) => '${match.group(1)}\n\n',
-    );
-    markdown =
-        markdown.replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), '\n');
-
-    // Convert blockquotes
-    markdown = markdown.replaceAllMapped(
-      RegExp(r'<blockquote[^>]*>(.*?)</blockquote>',
-          caseSensitive: false, dotAll: true),
-      (match) => '> ${match.group(1)}\n\n',
-    );
-
-    // Remove remaining HTML tags
-    markdown = markdown.replaceAll(RegExp(r'<[^>]*>'), '');
-
-    return _cleanText(markdown);
+    return _tidyMarkdown(buffer.toString());
   }
 
-  /// Clean HTML while preserving basic structure
-  static String toCleanHtml(String html) {
-    // Remove unwanted elements
-    String cleaned = html.replaceAll(
-        RegExp(r'<(script|style|nav|header|footer|aside|menu)[^>]*>.*?</\1>',
-            caseSensitive: false, dotAll: true),
-        '');
+  /// Collapses whitespace **without** flattening list indentation.
+  ///
+  /// A blanket `' *\n *' -> '\n'` pass would strip the leading spaces that
+  /// carry nesting in Markdown, turning a nested list into a flat one. So each
+  /// line keeps its indent and is normalised only from the first non-space
+  /// character onwards.
+  static String _tidyMarkdown(String markdown) {
+    final lines = markdown.split('\n').map((line) {
+      final trimmedEnd = line.trimRight();
+      if (trimmedEnd.trim().isEmpty) return '';
 
-    // Remove comments
-    cleaned = cleaned.replaceAll(RegExp(r'<!--.*?-->', dotAll: true), '');
-
-    // Clean up attributes but keep essential ones
-    cleaned = cleaned.replaceAllMapped(
-        RegExp(r'<([a-z]+)[^>]*>', caseSensitive: false), (match) {
-      final tag = match.group(1)!.toLowerCase();
-      switch (tag) {
-        case 'a':
-          // Keep href attribute for links
-          final hrefMatch =
-              RegExp(r'href=[\"\x27]([^\"\x27]*)[\"\x27]', caseSensitive: false)
-                  .firstMatch(match.group(0)!);
-          return hrefMatch != null ? '<a href="${hrefMatch.group(1)}">' : '<a>';
-        case 'img':
-          // Keep src and alt for images
-          final imgMatch = RegExp(
-                  r'src=[\"\x27]([^\"\x27]*)[\"\x27].*?alt=[\"\x27]([^\"\x27]*)[\"\x27]',
-                  caseSensitive: false)
-              .firstMatch(match.group(0)!);
-          return imgMatch != null
-              ? '<img src="${imgMatch.group(1)}" alt="${imgMatch.group(2)}">'
-              : '<img>';
-        default:
-          return '<$tag>';
-      }
+      final indent = trimmedEnd.length - trimmedEnd.trimLeft().length;
+      final content = trimmedEnd.trimLeft().replaceAll(RegExp(r'[ \t]+'), ' ');
+      return '${' ' * indent}$content';
     });
 
-    return cleaned;
+    return lines
+        .join('\n')
+        .replaceAll(RegExp(r'\n{3,}'), '\n\n')
+        .trim();
   }
 
-  /// Extract readable content (similar to Readability.js)
-  static String toReadableContent(String html) {
-    // Remove script, style, nav, header, footer, sidebar elements
-    String content = html.replaceAll(
-        RegExp(
-            r'<(script|style|nav|header|footer|aside|sidebar|menu|form)[^>]*>.*?</\1>',
-            caseSensitive: false,
-            dotAll: true),
-        '');
+  /// The main article body, with navigation, headers and footers removed.
+  ///
+  /// A first pass at readability: page chrome is dropped, then the densest
+  /// content container wins. Full node scoring — link density, paragraph
+  /// weight, negative class patterns — lands in Phase 2.
+  static String toReadableContent(HtmlDocument document) {
+    final clean = _sanitizedCopy(document, removeChrome: true);
 
-    // Remove elements commonly used for ads and navigation
-    content = content.replaceAll(
-        RegExp(
-            r'<[^>]*class=[\"\x27][^\"\x27]*(?:ad|advertisement|banner|social|share|comment|sidebar|navigation|nav)[^\"\x27]*[\"\x27][^>]*>.*?</[^>]*>',
-            caseSensitive: false,
-            dotAll: true),
-        '');
-
-    // Focus on content-rich elements
-    final contentSelectors = [
-      r'<article[^>]*>(.*?)</article>',
-      r'<main[^>]*>(.*?)</main>',
-      r'<div[^>]*class=[\"\x27][^\"\x27]*(?:content|article|post|entry)[^\"\x27]*[\"\x27][^>]*>(.*?)</div>',
-    ];
-
-    String? bestContent;
-    int maxLength = 0;
-
-    for (final selector in contentSelectors) {
-      final matches = RegExp(selector, caseSensitive: false, dotAll: true)
-          .allMatches(content);
-      for (final match in matches) {
-        final extracted = match.group(1) ?? '';
-        final textLength = toPlainText(extracted).length;
-        if (textLength > maxLength) {
-          maxLength = textLength;
-          bestContent = extracted;
-        }
-      }
-    }
-
-    // If no specific content area found, try to extract paragraphs
-    if (bestContent == null || maxLength < 200) {
-      final paragraphs =
-          RegExp(r'<p[^>]*>(.*?)</p>', caseSensitive: false, dotAll: true)
-              .allMatches(content)
-              .map((match) => match.group(1) ?? '')
-              .where((p) => p.trim().length > 50)
-              .join('\n\n');
-
-      if (paragraphs.isNotEmpty) {
-        bestContent = paragraphs;
-      }
-    }
-
-    return bestContent != null
-        ? toPlainText(bestContent)
-        : toPlainText(content);
-  }
-
-  /// Remove clutter elements like ads, navigation, etc.
-  static String removeClutter(String html) {
-    String cleaned = html;
-
-    // Remove script and style tags
-    cleaned = cleaned.replaceAll(
-        RegExp(r'<(script|style)[^>]*>.*?</\1>',
-            caseSensitive: false, dotAll: true),
-        '');
-
-    // Remove navigation elements
-    cleaned = cleaned.replaceAll(
-        RegExp(r'<(nav|header|footer|aside|menu)[^>]*>.*?</\1>',
-            caseSensitive: false, dotAll: true),
-        '');
-
-    // Remove elements with ad-related classes/ids
-    final adPatterns = [
-      r'ad',
-      r'advertisement',
-      r'banner',
-      r'popup',
-      r'modal',
-      r'social',
-      r'share',
-      r'comment',
-      r'sidebar',
-      r'widget',
-      r'navigation',
-      r'nav',
-      r'menu',
-      r'breadcrumb'
-    ];
-
-    for (final pattern in adPatterns) {
-      cleaned = cleaned.replaceAll(
-          RegExp(
-              r'<[^>]*(?:class|id)=[\"\x27][^\"\x27]*' +
-                  pattern +
-                  r'[^\"\x27]*[\"\x27][^>]*>.*?</[^>]*>',
-              caseSensitive: false,
-              dotAll: true),
-          '');
-    }
-
-    return cleaned;
-  }
-
-  /// Extract readable text with smart paragraph detection
-  static String extractReadableText(String html) {
-    // First remove clutter
-    final String content = removeClutter(html);
-
-    // Extract text from content-rich elements
-    final contentElements = [
+    const candidates = [
       'article',
       'main',
-      'section',
-      '[class*="content"]',
-      '[class*="article"]',
-      '[class*="post"]'
+      '[role=main]',
+      '.post-content',
+      '.entry-content',
+      '.article-body',
+      '#content',
     ];
 
-    String bestContent = '';
-    int maxScore = 0;
+    String? best;
+    var bestLength = 0;
 
-    for (final element in contentElements) {
-      final pattern = element.startsWith('[')
-          ? r'<[^>]*' +
-              element.replaceAll(RegExp(r'[\[\]*"]'), r'\$&') +
-              r'[^>]*>(.*?)</[^>]*>'
-          : '<$element[^>]*>(.*?)</$element>';
-
-      final matches = RegExp(pattern, caseSensitive: false, dotAll: true)
-          .allMatches(content);
-
-      for (final match in matches) {
-        final text = toPlainText(match.group(1) ?? '');
-        final score = _calculateContentScore(text);
-
-        if (score > maxScore) {
-          maxScore = score;
-          bestContent = text;
+    for (final selector in candidates) {
+      for (final node in clean.select(selector)) {
+        final text = node.blockText;
+        if (text.length > bestLength) {
+          bestLength = text.length;
+          best = text;
         }
       }
     }
 
-    return bestContent.isNotEmpty ? bestContent : toPlainText(content);
+    if (best != null && bestLength >= 200) return best;
+
+    final paragraphs = clean
+        .select('p')
+        .map((p) => p.text)
+        .where((t) => t.length > 40)
+        .join('\n\n');
+
+    if (paragraphs.isNotEmpty) return paragraphs;
+    return best ?? (clean.body?.blockText ?? '');
   }
 
-  /// Calculate content quality score
-  static int _calculateContentScore(String text) {
-    if (text.trim().isEmpty) return 0;
+  /// Every table on the page, as structured rows rather than flattened text.
+  static List<ExtractedTable> extractTables(HtmlDocument document) {
+    final tables = <ExtractedTable>[];
 
-    int score = 0;
+    for (final table in document.select('table')) {
+      final headers = <String>[];
+      final rows = <List<String>>[];
 
-    // Length score (prefer longer content)
-    score += (text.length / 10).round();
+      for (final row in table.select('tr')) {
+        final cells = row.select('th, td');
+        if (cells.isEmpty) continue;
 
-    // Sentence score (prefer content with proper sentences)
-    final sentences = text.split(RegExp(r'[.!?]+'));
-    score += sentences.length * 5;
+        final values = cells.map((c) => c.text).toList();
+        final isHeaderRow = cells.every((c) => c.tagName == 'th');
 
-    // Word score (prefer content with reasonable word count)
-    final words = text.split(RegExp(r'\s+'));
-    if (words.length > 50 && words.length < 2000) {
-      score += 50;
-    }
+        if (isHeaderRow && headers.isEmpty) {
+          headers.addAll(values);
+        } else {
+          rows.add(values);
+        }
+      }
 
-    // Penalize very short sentences (likely navigation/ads)
-    final avgSentenceLength = words.length / sentences.length;
-    if (avgSentenceLength < 3) {
-      score -= 30;
-    }
-
-    return score;
-  }
-
-  /// Clean and normalize text
-  static String _cleanText(String text) {
-    // Decode HTML entities
-    String cleaned = text
-        .replaceAll('&amp;', '&')
-        .replaceAll('&lt;', '<')
-        .replaceAll('&gt;', '>')
-        .replaceAll('&quot;', '"')
-        .replaceAll('&#39;', "'")
-        .replaceAll('&nbsp;', ' ')
-        .replaceAll('&copy;', '©')
-        .replaceAll('&reg;', '®')
-        .replaceAll('&trade;', '™')
-        .replaceAll('&ndash;', '–')
-        .replaceAll('&mdash;', '—')
-        .replaceAll('&hellip;', '…');
-
-    // Clean up whitespace
-    cleaned = cleaned
-        .replaceAll(
-            RegExp(r'\n\s*\n\s*\n+'), '\n\n') // Remove excessive line breaks
-        .replaceAll(RegExp(r'[ \t]+'), ' ') // Normalize spaces
-        .replaceAll(RegExp(r'\n '), '\n') // Remove leading spaces on new lines
-        .trim();
-
-    return cleaned;
-  }
-
-  /// Word count for text
-  static int wordCount(String text) {
-    return text
-        .trim()
-        .split(RegExp(r'\s+'))
-        .where((word) => word.isNotEmpty)
-        .length;
-  }
-
-  /// Reading time estimation (average 200 words per minute)
-  static Duration estimateReadingTime(String text, {int wordsPerMinute = 200}) {
-    final words = wordCount(text);
-    final minutes = (words / wordsPerMinute).ceil();
-    return Duration(minutes: minutes);
-  }
-
-  /// Extract specific content types
-  static Map<String, List<String>> extractSpecificContent(String html) {
-    return {
-      'headings': _extractHeadings(html),
-      'links': _extractLinks(html),
-      'images': _extractImages(html),
-      'lists': _extractLists(html),
-      'quotes': _extractQuotes(html),
-      'tables': _extractTables(html),
-    };
-  }
-
-  static List<String> _extractHeadings(String html) {
-    final headings = <String>[];
-    for (int i = 1; i <= 6; i++) {
-      final matches =
-          RegExp('<h$i[^>]*>(.*?)</h$i>', caseSensitive: false, dotAll: true)
-              .allMatches(html);
-      headings.addAll(matches.map((m) => _cleanText(m.group(1) ?? '')));
-    }
-    return headings;
-  }
-
-  static List<String> _extractLinks(String html) {
-    return RegExp(r'<a[^>]*href=[\"\x27]([^\"\x27]*)[\"\x27][^>]*>(.*?)</a>',
-            caseSensitive: false, dotAll: true)
-        .allMatches(html)
-        .map((m) => '${_cleanText(m.group(2) ?? '')}: ${m.group(1)}')
-        .toList();
-  }
-
-  static List<String> _extractImages(String html) {
-    return RegExp(
-            r'<img[^>]*src=[\"\x27]([^\"\x27]*)[\"\x27][^>]*alt=[\"\x27]([^\"\x27]*)[\"\x27][^>]*/?>',
-            caseSensitive: false)
-        .allMatches(html)
-        .map((m) => '${m.group(2)}: ${m.group(1)}')
-        .toList();
-  }
-
-  static List<String> _extractLists(String html) {
-    final lists = <String>[];
-    final listMatches =
-        RegExp(r'<[ou]l[^>]*>(.*?)</[ou]l>', caseSensitive: false, dotAll: true)
-            .allMatches(html);
-
-    for (final match in listMatches) {
-      final items =
-          RegExp(r'<li[^>]*>(.*?)</li>', caseSensitive: false, dotAll: true)
-              .allMatches(match.group(1) ?? '')
-              .map((m) => _cleanText(m.group(1) ?? ''))
-              .join('\n• ');
-      if (items.isNotEmpty) lists.add('• $items');
-    }
-
-    return lists;
-  }
-
-  static List<String> _extractQuotes(String html) {
-    return RegExp(r'<blockquote[^>]*>(.*?)</blockquote>',
-            caseSensitive: false, dotAll: true)
-        .allMatches(html)
-        .map((m) => _cleanText(m.group(1) ?? ''))
-        .toList();
-  }
-
-  static List<String> _extractTables(String html) {
-    final tables = <String>[];
-    final tableMatches =
-        RegExp(r'<table[^>]*>(.*?)</table>', caseSensitive: false, dotAll: true)
-            .allMatches(html);
-
-    for (final match in tableMatches) {
-      final tableContent = match.group(1) ?? '';
-      final rows =
-          RegExp(r'<tr[^>]*>(.*?)</tr>', caseSensitive: false, dotAll: true)
-              .allMatches(tableContent)
-              .map((rowMatch) {
-                final cells = RegExp(r'<t[hd][^>]*>(.*?)</t[hd]>',
-                        caseSensitive: false, dotAll: true)
-                    .allMatches(rowMatch.group(1) ?? '')
-                    .map((cellMatch) => _cleanText(cellMatch.group(1) ?? ''))
-                    .join(' | ');
-                return cells;
-              })
-              .where((row) => row.isNotEmpty)
-              .join('\n');
-
-      if (rows.isNotEmpty) tables.add(rows);
+      if (headers.isNotEmpty || rows.isNotEmpty) {
+        tables.add(ExtractedTable(headers: headers, rows: rows));
+      }
     }
 
     return tables;
+  }
+
+  /// Headings, links, images, lists, quotes and tables, grouped by kind.
+  static Map<String, List<String>> extractSpecificContent(
+    HtmlDocument document,
+  ) =>
+      {
+        'headings': document
+            .select('h1, h2, h3, h4, h5, h6')
+            .map((n) => n.text)
+            .where((t) => t.isNotEmpty)
+            .toList(),
+        'links': document
+            .select('a[href]')
+            .map((n) => '${n.text}: ${n.absoluteUrl('href') ?? n.attr('href')}')
+            .toList(),
+        'images': document
+            .select('img')
+            .map((n) => '${n.attr('alt') ?? ''}: ${n.absoluteUrl('src') ?? ''}')
+            .toList(),
+        'lists': document
+            .select('ul, ol')
+            .map((list) =>
+                list.select('li').map((li) => '• ${li.text}').join('\n'))
+            .where((t) => t.isNotEmpty)
+            .toList(),
+        'quotes': document
+            .select('blockquote')
+            .map((n) => n.text)
+            .where((t) => t.isNotEmpty)
+            .toList(),
+        'tables': extractTables(document).map((t) => t.toMarkdown()).toList(),
+      };
+
+  /// Words in [text], by whitespace.
+  static int wordCount(String text) =>
+      text.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).length;
+
+  /// How long [text] would take to read.
+  static Duration estimateReadingTime(String text, {int wordsPerMinute = 200}) {
+    final words = wordCount(text);
+    if (words == 0) return Duration.zero;
+    return Duration(seconds: (words / wordsPerMinute * 60).ceil());
+  }
+
+  /// A sanitized clone, so formatting never mutates the caller's document.
+  static HtmlDocument _sanitizedCopy(
+    HtmlDocument document, {
+    bool removeChrome = false,
+  }) =>
+      HtmlDocument.parse(document.raw.outerHtml, url: document.url)
+          .sanitize(removeChrome: removeChrome);
+
+  // -------------------------------------------------------------------------
+  // Markdown walker
+  // -------------------------------------------------------------------------
+
+  static void _writeMarkdown(
+    dom.Node node,
+    StringBuffer buffer,
+    String? baseUrl, {
+    int listDepth = 0,
+  }) {
+    for (final child in node.nodes) {
+      if (child.nodeType == dom.Node.TEXT_NODE) {
+        buffer.write(child.text ?? '');
+        continue;
+      }
+      if (child is! dom.Element) continue;
+
+      switch (child.localName) {
+        case 'h1' || 'h2' || 'h3' || 'h4' || 'h5' || 'h6':
+          final level = int.tryParse(child.localName!.substring(1)) ?? 1;
+          buffer.write('\n\n${'#' * level} ${_inline(child)}\n\n');
+
+        case 'p':
+          buffer.write('\n\n');
+          _writeMarkdown(child, buffer, baseUrl, listDepth: listDepth);
+          buffer.write('\n\n');
+
+        case 'br':
+          buffer.write('\n');
+
+        case 'hr':
+          buffer.write('\n\n---\n\n');
+
+        case 'strong' || 'b':
+          final text = _inline(child);
+          if (text.isNotEmpty) buffer.write('**$text**');
+
+        case 'em' || 'i':
+          final text = _inline(child);
+          if (text.isNotEmpty) buffer.write('*$text*');
+
+        case 'code':
+          // A <code> inside <pre> is handled by the 'pre' branch.
+          if (child.parent?.localName != 'pre') {
+            buffer.write('`${_inline(child)}`');
+          } else {
+            buffer.write(child.text);
+          }
+
+        case 'pre':
+          buffer.write('\n\n```\n${child.text.trim()}\n```\n\n');
+
+        case 'a':
+          final text = _inline(child);
+          final href = child.attributes['href'];
+          if (href == null || href.isEmpty) {
+            buffer.write(text);
+          } else {
+            final resolved = _resolve(href, baseUrl);
+            buffer.write('[$text]($resolved)');
+          }
+
+        case 'img':
+          final alt = child.attributes['alt'] ?? '';
+          final src = child.attributes['src'];
+          if (src != null && src.isNotEmpty) {
+            buffer.write('![$alt](${_resolve(src, baseUrl)})');
+          }
+
+        case 'ul' || 'ol':
+          buffer.write('\n');
+          final ordered = child.localName == 'ol';
+          var index = 1;
+          for (final item in child.children) {
+            if (item.localName != 'li') continue;
+            final marker = ordered ? '${index++}.' : '-';
+            buffer.write('\n${'  ' * listDepth}$marker ');
+            _writeMarkdown(item, buffer, baseUrl, listDepth: listDepth + 1);
+          }
+          buffer.write('\n');
+
+        case 'li':
+          // Reached only for a stray <li> outside a list.
+          buffer.write('\n${'  ' * listDepth}- ');
+          _writeMarkdown(child, buffer, baseUrl, listDepth: listDepth + 1);
+
+        case 'blockquote':
+          final inner = StringBuffer();
+          _writeMarkdown(child, inner, baseUrl, listDepth: listDepth);
+          final quoted = inner
+              .toString()
+              .trim()
+              .split('\n')
+              .map((line) => '> $line')
+              .join('\n');
+          buffer.write('\n\n$quoted\n\n');
+
+        case 'table':
+          buffer.write('\n\n${_tableToMarkdown(child)}\n\n');
+
+        default:
+          _writeMarkdown(child, buffer, baseUrl, listDepth: listDepth);
+      }
+    }
+  }
+
+  static String _tableToMarkdown(dom.Element table) {
+    final headers = <String>[];
+    final rows = <List<String>>[];
+
+    for (final row in table.querySelectorAll('tr')) {
+      final cells = row.querySelectorAll('th, td');
+      if (cells.isEmpty) continue;
+
+      final values =
+          cells.map((c) => c.text.replaceAll(RegExp(r'\s+'), ' ').trim()).toList();
+
+      if (cells.every((c) => c.localName == 'th') && headers.isEmpty) {
+        headers.addAll(values);
+      } else {
+        rows.add(values);
+      }
+    }
+
+    return ExtractedTable(headers: headers, rows: rows).toMarkdown();
+  }
+
+  /// Inline text of [element], collapsed to a single line.
+  static String _inline(dom.Element element) =>
+      element.text.replaceAll(RegExp(r'\s+'), ' ').trim();
+
+  static String _resolve(String reference, String? baseUrl) {
+    if (baseUrl == null) return reference;
+    try {
+      return Uri.parse(baseUrl).resolve(reference).toString();
+    } on FormatException {
+      return reference;
+    }
   }
 }

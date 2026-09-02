@@ -21,11 +21,22 @@
 /// utilities.
 library;
 
-export 'src/config/scraper_config.dart';
-export 'src/exceptions/scraper_exceptions.dart';
+export 'src/cache/cache_store.dart';
+export 'src/core/cancellation.dart';
+export 'src/core/platform_info.dart';
+export 'src/core/scraper_config.dart';
+export 'src/core/scraper_exceptions.dart';
+export 'src/dom/html_document.dart';
+export 'src/dom/sanitizer.dart';
+export 'src/dom/selector.dart';
+export 'src/dom/url_resolver.dart';
 export 'src/mobile_scraper.dart';
 export 'src/models/scrape_request.dart';
 export 'src/models/scrape_result.dart';
-export 'src/utils/cache_manager.dart';
+export 'src/net/encoding_detector.dart';
+export 'src/net/fetcher.dart';
+export 'src/net/rate_limiter.dart';
+export 'src/net/retry_policy.dart';
+export 'src/net/robots_policy.dart';
 export 'src/utils/content_formatter.dart';
 export 'src/utils/smart_extractor.dart';

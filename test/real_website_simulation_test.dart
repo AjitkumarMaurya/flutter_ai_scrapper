@@ -241,11 +241,10 @@ void main() {
     ''';
 
     group('News Website Tests', () {
-      late TestMobileScraper scraper;
+      late MobileScraper scraper;
 
       setUp(() {
-        scraper = TestMobileScraper(
-            'https://example-news.com/ai-healthcare', newsWebsiteHtml);
+        scraper = MobileScraper.fromHtml(newsWebsiteHtml, url: 'https://example-news.com/ai-healthcare');
       });
 
       test('should extract all heading levels (H1, H2, H3)', () {
@@ -300,11 +299,10 @@ void main() {
     });
 
     group('E-commerce Website Tests', () {
-      late TestMobileScraper scraper;
+      late MobileScraper scraper;
 
       setUp(() {
-        scraper = TestMobileScraper(
-            'https://example-store.com/macbook-pro', ecommerceWebsiteHtml);
+        scraper = MobileScraper.fromHtml(ecommerceWebsiteHtml, url: 'https://example-store.com/macbook-pro');
       });
 
       test('should extract product information and prices', () {
@@ -337,7 +335,15 @@ void main() {
         print('Reviews found: ${reviews.length}');
         print('Customer names: ${customerNames.join(", ")}');
 
-        expect(customerNames.length, equals(2));
+        // queryWithRegex is case-sensitive in 2.0, so `[A-Z][a-z]+` means a
+        // Capitalised word as written. 1.x forced case-insensitivity with no
+        // opt-out, so this same pattern also matched `-performance laptop`,
+        // `- Best Deal` and `-inch Retina` — five results for two reviewers.
+        // Three, not two: the pattern also matches the og:title
+        // "Premium Laptop - Best Deal" in <head>. That is the pattern being
+        // loose, not the library being wrong — a regex over markup sees the
+        // whole document.
+        expect(customerNames.length, equals(3));
         expect(customerNames, contains('Sarah Tech'));
         expect(customerNames, contains('Mike Developer'));
       });
@@ -355,11 +361,10 @@ void main() {
     });
 
     group('Blog Website Tests', () {
-      late TestMobileScraper scraper;
+      late MobileScraper scraper;
 
       setUp(() {
-        scraper = TestMobileScraper(
-            'https://example-blog.com/performance-tips', blogWebsiteHtml);
+        scraper = MobileScraper.fromHtml(blogWebsiteHtml, url: 'https://example-blog.com/performance-tips');
       });
 
       test('should extract blog structure and content', () {
@@ -405,17 +410,19 @@ void main() {
         print('Contains H3 headers: ${markdown.contains('### Tip 1')}');
 
         expect(wordCount, greaterThan(50));
-        expect(readingTime.inMinutes, greaterThanOrEqualTo(1));
+        // estimateReadingTime now reports seconds, not whole minutes: a
+        // 60-word post takes ~18s, and rounding that up to "1 minute" was a
+        // small lie. Callers that want minutes can still round.
+        expect(readingTime.inSeconds, greaterThan(0));
         expect(markdown, contains('# 10 Flutter Tips'));
       });
     });
 
     group('Portfolio Website Tests', () {
-      late TestMobileScraper scraper;
+      late MobileScraper scraper;
 
       setUp(() {
-        scraper = TestMobileScraper(
-            'https://example-portfolio.com', portfolioWebsiteHtml);
+        scraper = MobileScraper.fromHtml(portfolioWebsiteHtml, url: 'https://example-portfolio.com');
       });
 
       test('should extract portfolio sections and projects', () {
@@ -449,7 +456,16 @@ void main() {
         print('LinkedIn: ${linkedinUrls.join(", ")}');
 
         expect(emails, contains('john@example-portfolio.com'));
-        expect(linkedinUrls, contains('https://example.com/in/johndesigner'));
+        // The LinkedIn URL is printed as prose, not linked, so match against
+        // visible text. Over markup the same pattern captured
+        // `…/johndesigner</p>` — a regex cannot tell where an element ends,
+        // which is the whole reason RegexTarget.text exists.
+        final linkedInFromText = scraper.queryWithRegex(
+          pattern: r'(https://example\.com/in/[^\s]+)',
+          target: RegexTarget.text,
+        );
+        expect(linkedInFromText,
+            contains('https://example.com/in/johndesigner'));
       });
 
       test('should extract testimonials using blockquote', () {
@@ -471,29 +487,27 @@ void main() {
           {
             'name': 'News',
             'scraper':
-                TestMobileScraper('https://example-news.com', newsWebsiteHtml)
+                MobileScraper.fromHtml(newsWebsiteHtml, url: 'https://example-news.com')
           },
           {
             'name': 'E-commerce',
-            'scraper': TestMobileScraper(
-                'https://example-store.com', ecommerceWebsiteHtml)
+            'scraper': MobileScraper.fromHtml(ecommerceWebsiteHtml, url: 'https://example-store.com')
           },
           {
             'name': 'Blog',
             'scraper':
-                TestMobileScraper('https://example-blog.com', blogWebsiteHtml)
+                MobileScraper.fromHtml(blogWebsiteHtml, url: 'https://example-blog.com')
           },
           {
             'name': 'Portfolio',
-            'scraper': TestMobileScraper(
-                'https://example-portfolio.com', portfolioWebsiteHtml)
+            'scraper': MobileScraper.fromHtml(portfolioWebsiteHtml, url: 'https://example-portfolio.com')
           },
         ];
 
         print('\n🔄 === CROSS-WEBSITE FUNCTIONALITY COMPARISON ===');
 
         for (final website in websites) {
-          final scraper = website['scraper'] as TestMobileScraper;
+          final scraper = website['scraper']! as MobileScraper;
           final smartContent = scraper.extractSmartContent();
           final h1Count = scraper.queryAll(tag: 'h1').length;
           final h2Count = scraper.queryAll(tag: 'h2').length;
@@ -522,19 +536,19 @@ void main() {
           {
             'name': 'News',
             'scraper':
-                TestMobileScraper('https://example-news.com', newsWebsiteHtml)
+                MobileScraper.fromHtml(newsWebsiteHtml, url: 'https://example-news.com')
           },
           {
             'name': 'Blog',
             'scraper':
-                TestMobileScraper('https://example-blog.com', blogWebsiteHtml)
+                MobileScraper.fromHtml(blogWebsiteHtml, url: 'https://example-blog.com')
           },
         ];
 
         print('\n📝 === CONTENT FORMATTING CONSISTENCY ===');
 
         for (final website in websites) {
-          final scraper = website['scraper'] as TestMobileScraper;
+          final scraper = website['scraper']! as MobileScraper;
           final markdown = scraper.toMarkdown();
           final plainText = scraper.toPlainText();
           final readingTime = scraper.estimateReadingTime();
@@ -553,159 +567,4 @@ void main() {
       });
     });
   });
-}
-
-/// Test helper class for simulating mobile scraper functionality
-class TestMobileScraper extends MobileScraper {
-  TestMobileScraper(String url, String htmlContent) : super(url: url) {
-    _htmlContent = htmlContent;
-  }
-
-  String? _htmlContent;
-
-  @override
-  String? get rawHtml => _htmlContent;
-
-  @override
-  bool get isLoaded => _htmlContent != null;
-
-  @override
-  List<String> queryAll({
-    required String tag,
-    String? className,
-    String? id,
-  }) {
-    if (_htmlContent == null) {
-      throw ScraperNotInitializedException();
-    }
-
-    try {
-      List<String> results = [];
-      String pattern = _buildTagPattern(tag, className: className, id: id);
-
-      RegExp regex = RegExp(pattern, caseSensitive: false, dotAll: true);
-      Iterable<RegExpMatch> matches = regex.allMatches(_htmlContent!);
-
-      for (RegExpMatch match in matches) {
-        String? content = match.group(1);
-        if (content != null) {
-          String cleanContent = _cleanHtmlContent(content);
-          if (cleanContent.isNotEmpty) {
-            results.add(cleanContent);
-          }
-        }
-      }
-
-      return results;
-    } catch (e) {
-      throw ParseException(
-          'Failed to parse HTML with tag pattern', _htmlContent, e);
-    }
-  }
-
-  @override
-  List<String> queryWithRegex({
-    required String pattern,
-    int group = 1,
-  }) {
-    if (_htmlContent == null) {
-      throw ScraperNotInitializedException();
-    }
-
-    try {
-      List<String> results = [];
-      RegExp regex = RegExp(pattern, caseSensitive: false, dotAll: true);
-      Iterable<RegExpMatch> matches = regex.allMatches(_htmlContent!);
-
-      for (RegExpMatch match in matches) {
-        String? content = match.group(group);
-        if (content != null) {
-          String cleanContent = content.trim();
-          if (cleanContent.isNotEmpty) {
-            results.add(cleanContent);
-          }
-        }
-      }
-
-      return results;
-    } catch (e) {
-      throw ParseException(
-          'Failed to parse HTML with regex pattern: $pattern', _htmlContent, e);
-    }
-  }
-
-  @override
-  SmartContent extractSmartContent() {
-    if (_htmlContent == null) {
-      throw ScraperNotInitializedException();
-    }
-    return SmartExtractor.extractAll(_htmlContent!);
-  }
-
-  @override
-  String toMarkdown() {
-    if (_htmlContent == null) {
-      throw ScraperNotInitializedException();
-    }
-    return ContentFormatter.toMarkdown(_htmlContent!);
-  }
-
-  @override
-  String toPlainText() {
-    if (_htmlContent == null) {
-      throw ScraperNotInitializedException();
-    }
-    return ContentFormatter.toPlainText(_htmlContent!);
-  }
-
-  @override
-  int getWordCount() {
-    final plainText = toPlainText();
-    return ContentFormatter.wordCount(plainText);
-  }
-
-  @override
-  Duration estimateReadingTime({int wordsPerMinute = 200}) {
-    final plainText = toPlainText();
-    return ContentFormatter.estimateReadingTime(plainText,
-        wordsPerMinute: wordsPerMinute);
-  }
-
-  // Private helper methods
-  String _buildTagPattern(String tag, {String? className, String? id}) {
-    String attributePattern = '';
-
-    if (className != null) {
-      attributePattern +=
-          '(?=.*class=["\'](?:[^"\']*\\s)?${RegExp.escape(className)}(?:\\s[^"\']*)?["\'])';
-    }
-
-    if (id != null) {
-      attributePattern += '(?=.*id=["\']${RegExp.escape(id)}["\'])';
-    }
-
-    return '<${RegExp.escape(tag)}$attributePattern[^>]*>(.*?)<\\/${RegExp.escape(tag)}>';
-  }
-
-  String _cleanHtmlContent(String content) {
-    // Remove HTML tags
-    String cleaned = content.replaceAll(RegExp(r'<[^>]*>'), '');
-
-    // Decode common HTML entities
-    cleaned = cleaned
-        .replaceAll('&amp;', '&')
-        .replaceAll('&lt;', '<')
-        .replaceAll('&gt;', '>')
-        .replaceAll('&quot;', '"')
-        .replaceAll('&#39;', "'")
-        .replaceAll('&nbsp;', ' ')
-        .replaceAll('&copy;', '©')
-        .replaceAll('&reg;', '®')
-        .replaceAll('&trade;', '™');
-
-    // Clean up whitespace
-    cleaned = cleaned.replaceAll(RegExp(r'\s+'), ' ').trim();
-
-    return cleaned;
-  }
 }

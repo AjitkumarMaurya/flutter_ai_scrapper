@@ -23,7 +23,13 @@ void main() {
     ''';
 
     setUp(() {
-      scraper = MobileScraper(url: testUrl);
+      scraper = MobileScraper(
+        url: testUrl,
+        // 2.0 removed the FLUTTER_TEST environment sniffing that used to
+        // bypass the platform gate from inside production code. Tests
+        // now declare the platform they mean to exercise.
+        platformInfo: const FakePlatformInfo.android(),
+      );
     });
 
     group('HTML Loading', () {
@@ -33,12 +39,16 @@ void main() {
         expect(scraper.isLoaded, isFalse);
       });
 
-      test('should throw InvalidParameterException with invalid URL format',
-          () {
-        // Now it throws during construction due to validation
+      test('should throw InvalidUrlException with invalid URL format', () {
+        // Validation runs during construction. 2.0 splits URL problems out of
+        // the catch-all InvalidParameterException into their own type, so a
+        // caller can tell "bad address" from "bad selector".
         expect(
-          () => MobileScraper(url: 'invalid-url'),
-          throwsA(isA<InvalidParameterException>()),
+          () => MobileScraper(
+            url: 'invalid-url',
+            platformInfo: const FakePlatformInfo.android(),
+          ),
+          throwsA(isA<InvalidUrlException>()),
         );
       });
     });
@@ -46,7 +56,7 @@ void main() {
     group('Tag-based Querying', () {
       test('should extract all matching tags', () {
         // Mock loaded state
-        scraper = TestMobileScraper(testUrl, testHtml);
+        scraper = MobileScraper.fromHtml(testHtml, url: testUrl);
 
         final results = scraper.queryAll(tag: 'h2');
         expect(results, hasLength(2));
@@ -55,7 +65,7 @@ void main() {
       });
 
       test('should extract tags with specific class', () {
-        scraper = TestMobileScraper(testUrl, testHtml);
+        scraper = MobileScraper.fromHtml(testHtml, url: testUrl);
 
         final results = scraper.queryAll(tag: 'h1', className: 'main-headline');
         expect(results, hasLength(1));
@@ -63,7 +73,7 @@ void main() {
       });
 
       test('should extract tag with specific ID', () {
-        scraper = TestMobileScraper(testUrl, testHtml);
+        scraper = MobileScraper.fromHtml(testHtml, url: testUrl);
 
         final results = scraper.queryAll(tag: 'div', id: 'scores');
         expect(results, hasLength(1));
@@ -71,21 +81,21 @@ void main() {
       });
 
       test('should return empty list for non-existent tags', () {
-        scraper = TestMobileScraper(testUrl, testHtml);
+        scraper = MobileScraper.fromHtml(testHtml, url: testUrl);
 
         final results = scraper.queryAll(tag: 'h3');
         expect(results, isEmpty);
       });
 
       test('should return first matching element with query method', () {
-        scraper = TestMobileScraper(testUrl, testHtml);
+        scraper = MobileScraper.fromHtml(testHtml, url: testUrl);
 
         final result = scraper.query(tag: 'p');
         expect(result, equals('This is paragraph content'));
       });
 
       test('should return null when no matches found with query method', () {
-        scraper = TestMobileScraper(testUrl, testHtml);
+        scraper = MobileScraper.fromHtml(testHtml, url: testUrl);
 
         final result = scraper.query(tag: 'h5');
         expect(result, isNull);
@@ -94,7 +104,7 @@ void main() {
 
     group('Regex-based Querying', () {
       test('should extract content using regex pattern', () {
-        scraper = TestMobileScraper(testUrl, testHtml);
+        scraper = MobileScraper.fromHtml(testHtml, url: testUrl);
 
         final results = scraper.queryWithRegex(pattern: r'Score:\s*(\d+)');
         expect(results, hasLength(2));
@@ -103,7 +113,7 @@ void main() {
       });
 
       test('should extract title using regex', () {
-        scraper = TestMobileScraper(testUrl, testHtml);
+        scraper = MobileScraper.fromHtml(testHtml, url: testUrl);
 
         final results =
             scraper.queryWithRegex(pattern: r'<title>(.*?)</title>');
@@ -112,14 +122,14 @@ void main() {
       });
 
       test('should return first match with queryWithRegexFirst', () {
-        scraper = TestMobileScraper(testUrl, testHtml);
+        scraper = MobileScraper.fromHtml(testHtml, url: testUrl);
 
         final result = scraper.queryWithRegexFirst(pattern: r'Score:\s*(\d+)');
         expect(result, equals('120'));
       });
 
       test('should return null when no regex matches found', () {
-        scraper = TestMobileScraper(testUrl, testHtml);
+        scraper = MobileScraper.fromHtml(testHtml, url: testUrl);
 
         final result =
             scraper.queryWithRegexFirst(pattern: r'NoMatch:\s*(\d+)');
@@ -153,7 +163,7 @@ void main() {
           <h1>Title with <strong>bold</strong> and <em>italic</em> text</h1>
         ''';
 
-        scraper = TestMobileScraper(testUrl, htmlWithTags);
+        scraper = MobileScraper.fromHtml(htmlWithTags, url: testUrl);
         final results = scraper.queryAll(tag: 'h1');
 
         expect(results.first, equals('Title with bold and italic text'));
@@ -164,7 +174,7 @@ void main() {
           <p>Test &amp; example with &quot;quotes&quot; and &lt;brackets&gt;</p>
         ''';
 
-        scraper = TestMobileScraper(testUrl, htmlWithEntities);
+        scraper = MobileScraper.fromHtml(htmlWithEntities, url: testUrl);
         final results = scraper.queryAll(tag: 'p');
 
         expect(results.first,
@@ -179,7 +189,7 @@ void main() {
           breaks</p>
         ''';
 
-        scraper = TestMobileScraper(testUrl, htmlWithWhitespace);
+        scraper = MobileScraper.fromHtml(htmlWithWhitespace, url: testUrl);
         final results = scraper.queryAll(tag: 'p');
 
         expect(
@@ -187,122 +197,4 @@ void main() {
       });
     });
   });
-}
-
-/// Test helper class that allows setting HTML content directly
-class TestMobileScraper extends MobileScraper {
-  TestMobileScraper(String url, String htmlContent) : super(url: url) {
-    _htmlContent = htmlContent;
-  }
-
-  String? _htmlContent;
-
-  @override
-  String? get rawHtml => _htmlContent;
-
-  @override
-  bool get isLoaded => _htmlContent != null;
-
-  @override
-  List<String> queryAll({
-    required String tag,
-    String? className,
-    String? id,
-  }) {
-    if (_htmlContent == null) {
-      throw ScraperNotInitializedException();
-    }
-
-    try {
-      List<String> results = [];
-      String pattern = _buildTagPattern(tag, className: className, id: id);
-
-      RegExp regex = RegExp(pattern, caseSensitive: false, dotAll: true);
-      Iterable<RegExpMatch> matches = regex.allMatches(_htmlContent!);
-
-      for (RegExpMatch match in matches) {
-        String? content = match.group(1);
-        if (content != null) {
-          String cleanContent = _cleanHtmlContent(content);
-          if (cleanContent.isNotEmpty) {
-            results.add(cleanContent);
-          }
-        }
-      }
-
-      return results;
-    } catch (e) {
-      throw ParseException(
-          'Failed to parse HTML with tag pattern', _htmlContent, e);
-    }
-  }
-
-  @override
-  List<String> queryWithRegex({
-    required String pattern,
-    int group = 1,
-  }) {
-    if (_htmlContent == null) {
-      throw ScraperNotInitializedException();
-    }
-
-    try {
-      List<String> results = [];
-      RegExp regex = RegExp(pattern, caseSensitive: false, dotAll: true);
-      Iterable<RegExpMatch> matches = regex.allMatches(_htmlContent!);
-
-      for (RegExpMatch match in matches) {
-        String? content = match.group(group);
-        if (content != null) {
-          String cleanContent = content.trim();
-          if (cleanContent.isNotEmpty) {
-            results.add(cleanContent);
-          }
-        }
-      }
-
-      return results;
-    } catch (e) {
-      throw ParseException(
-          'Failed to parse HTML with regex pattern: $pattern', _htmlContent, e);
-    }
-  }
-
-  // Private helper methods
-  String _buildTagPattern(String tag, {String? className, String? id}) {
-    String attributePattern = '';
-
-    if (className != null) {
-      attributePattern +=
-          '(?=.*class=["\'](?:[^"\']*\\s)?${RegExp.escape(className)}(?:\\s[^"\']*)?["\'])';
-    }
-
-    if (id != null) {
-      attributePattern += '(?=.*id=["\']${RegExp.escape(id)}["\'])';
-    }
-
-    return '<${RegExp.escape(tag)}$attributePattern[^>]*>(.*?)<\\/${RegExp.escape(tag)}>';
-  }
-
-  String _cleanHtmlContent(String content) {
-    // Remove HTML tags
-    String cleaned = content.replaceAll(RegExp(r'<[^>]*>'), '');
-
-    // Decode common HTML entities
-    cleaned = cleaned
-        .replaceAll('&amp;', '&')
-        .replaceAll('&lt;', '<')
-        .replaceAll('&gt;', '>')
-        .replaceAll('&quot;', '"')
-        .replaceAll('&#39;', "'")
-        .replaceAll('&nbsp;', ' ')
-        .replaceAll('&copy;', '©')
-        .replaceAll('&reg;', '®')
-        .replaceAll('&trade;', '™');
-
-    // Clean up whitespace
-    cleaned = cleaned.replaceAll(RegExp(r'\s+'), ' ').trim();
-
-    return cleaned;
-  }
 }

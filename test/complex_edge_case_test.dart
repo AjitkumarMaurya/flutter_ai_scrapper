@@ -247,11 +247,11 @@ void main() {
     ''';
 
     group('Advanced Regex Pattern Tests', () {
-      late TestMobileScraper scraper;
+      late MobileScraper scraper;
 
       setUp(() {
         scraper =
-            TestMobileScraper('https://advancedtech.com', complexWebsiteHtml);
+            MobileScraper.fromHtml(complexWebsiteHtml, url: 'https://advancedtech.com');
       });
 
       test('should extract complex pricing information using advanced regex',
@@ -309,7 +309,9 @@ void main() {
 
         // Extract LinkedIn profiles
         final linkedinProfiles = scraper.queryWithRegex(
-            pattern: r'linkedin\.com/(?:in|company)/([a-zA-Z0-9-]+)');
+            // The fixture hosts profiles at example.com/in/… — the original
+            // pattern looked for linkedin.com, which appears nowhere in it.
+            pattern: r'example\.com/(?:in|company)/([a-zA-Z0-9-]+)');
         print('LinkedIn profiles: ${linkedinProfiles.join(", ")}');
         expect(linkedinProfiles.length, greaterThanOrEqualTo(3));
       });
@@ -331,7 +333,9 @@ void main() {
         // Project values
         final projectValues = scraper.queryWithRegex(
             pattern:
-                r'\$([0-9,]+(?:\.[0-9]+)?[MBK]?)\s+(?:project|implementation|grant)');
+                // Allows one intervening word, so "$12.8M research grant"
+                // counts alongside "$5.2M project" and "$8.7M implementation".
+                r'\$([0-9,]+(?:\.[0-9]+)?[MBK]?)\s+(?:\w+\s+)?(?:project|implementation|grant)');
         print('Project values: ${projectValues.join(", ")}');
         expect(projectValues.length, greaterThanOrEqualTo(3));
       });
@@ -374,11 +378,11 @@ void main() {
     });
 
     group('Automated Title Extraction Methods', () {
-      late TestMobileScraper scraper;
+      late MobileScraper scraper;
 
       setUp(() {
         scraper =
-            TestMobileScraper('https://advancedtech.com', complexWebsiteHtml);
+            MobileScraper.fromHtml(complexWebsiteHtml, url: 'https://advancedtech.com');
       });
 
       test('should extract titles using multiple automated methods', () {
@@ -454,7 +458,7 @@ void main() {
     group('Error Generation and Edge Case Tests', () {
       test('should handle extremely long regex patterns without crashing', () {
         final scraper =
-            TestMobileScraper('https://test.com', complexWebsiteHtml);
+            MobileScraper.fromHtml(complexWebsiteHtml, url: 'https://test.com');
 
         // Extremely complex regex that might cause performance issues
         final complexPattern =
@@ -471,22 +475,26 @@ void main() {
 
       test('should handle invalid regex patterns gracefully', () {
         final scraper =
-            TestMobileScraper('https://test.com', complexWebsiteHtml);
+            MobileScraper.fromHtml(complexWebsiteHtml, url: 'https://test.com');
 
         print('\n❌ === INVALID REGEX HANDLING ===');
 
         // Test with invalid regex patterns that should cause errors
+        // Only patterns Dart's own RegExp rejects. The library does not
+        // invent a stricter dialect than the engine it delegates to — several
+        // of these (`*invalid quantifier`, `\k<invalid_reference>`) are
+        // accepted by Dart, and pretending otherwise would surprise callers.
         final invalidPatterns = [
           r'[unclosed bracket',
-          r'*invalid quantifier',
           r'(?invalid group',
-          r'\k<invalid_reference>',
         ];
 
         for (final pattern in invalidPatterns) {
-          expect(() {
-            scraper.queryWithRegex(pattern: pattern);
-          }, throwsA(isA<Exception>()));
+          expect(
+            () => scraper.queryWithRegex(pattern: pattern),
+            throwsA(isA<InvalidParameterException>()),
+            reason: pattern,
+          );
           print('✓ Invalid pattern "$pattern" properly threw exception');
         }
       });
@@ -494,15 +502,29 @@ void main() {
       test('should handle empty and null content gracefully', () {
         print('\n🚫 === EMPTY CONTENT HANDLING ===');
 
-        // Test with empty HTML
-        final emptyScraper = TestMobileScraper('https://empty.com', '');
-        expect(() {
-          emptyScraper.queryAll(tag: 'h1');
-        }, throwsA(isA<ScraperNotInitializedException>()));
+        // KNOWN_FAILURES #5, decided: an empty body is a *successful fetch of
+        // an empty document*, so it queries cleanly to no results.
+        // ScraperNotInitializedException now means only "load() was never
+        // called" — conflating the two hid real "you forgot to load" mistakes.
+        final emptyScraper = MobileScraper.fromHtml('', url: 'https://empty.com');
+        expect(emptyScraper.isLoaded, isTrue);
+        expect(emptyScraper.queryAll(tag: 'h1'), isEmpty);
+
+        // Never loaded at all: that is the case the exception is for.
+        final neverLoaded = MobileScraper(
+          url: 'https://empty.com',
+          platformInfo: const FakePlatformInfo.android(),
+        );
+        addTearDown(neverLoaded.dispose);
+        expect(
+          () => neverLoaded.queryAll(tag: 'h1'),
+          throwsA(isA<ScraperNotInitializedException>()),
+        );
 
         // Test with minimal HTML
-        final minimalScraper = TestMobileScraper(
-            'https://minimal.com', '<html><body></body></html>');
+        final minimalScraper = MobileScraper.fromHtml(
+            '<html><body></body></html>',
+            url: 'https://minimal.com');
         final results = minimalScraper.queryAll(tag: 'h1');
         expect(results, isEmpty);
         print('✓ Empty results handled gracefully');
@@ -519,7 +541,7 @@ void main() {
         ''';
 
         final nestedScraper =
-            TestMobileScraper('https://nested.com', deeplyNestedHtml);
+            MobileScraper.fromHtml(deeplyNestedHtml, url: 'https://nested.com');
 
         print('\n🏗️ === DEEPLY NESTED STRUCTURE TEST ===');
 
@@ -538,7 +560,7 @@ void main() {
           'should extract content with maximum complexity and verify consistency',
           () {
         final scraper =
-            TestMobileScraper('https://complex.com', complexWebsiteHtml);
+            MobileScraper.fromHtml(complexWebsiteHtml, url: 'https://complex.com');
 
         print('\n🎯 === MAXIMUM COMPLEXITY TEST ===');
 
@@ -588,159 +610,4 @@ void main() {
       });
     });
   });
-}
-
-/// Test helper class for simulating mobile scraper functionality
-class TestMobileScraper extends MobileScraper {
-  TestMobileScraper(String url, String htmlContent) : super(url: url) {
-    _htmlContent = htmlContent;
-  }
-
-  String? _htmlContent;
-
-  @override
-  String? get rawHtml => _htmlContent;
-
-  @override
-  bool get isLoaded => _htmlContent != null;
-
-  @override
-  List<String> queryAll({
-    required String tag,
-    String? className,
-    String? id,
-  }) {
-    if (_htmlContent == null) {
-      throw ScraperNotInitializedException();
-    }
-
-    try {
-      List<String> results = [];
-      String pattern = _buildTagPattern(tag, className: className, id: id);
-
-      RegExp regex = RegExp(pattern, caseSensitive: false, dotAll: true);
-      Iterable<RegExpMatch> matches = regex.allMatches(_htmlContent!);
-
-      for (RegExpMatch match in matches) {
-        String? content = match.group(1);
-        if (content != null) {
-          String cleanContent = _cleanHtmlContent(content);
-          if (cleanContent.isNotEmpty) {
-            results.add(cleanContent);
-          }
-        }
-      }
-
-      return results;
-    } catch (e) {
-      throw ParseException(
-          'Failed to parse HTML with tag pattern', _htmlContent, e);
-    }
-  }
-
-  @override
-  List<String> queryWithRegex({
-    required String pattern,
-    int group = 1,
-  }) {
-    if (_htmlContent == null) {
-      throw ScraperNotInitializedException();
-    }
-
-    try {
-      List<String> results = [];
-      RegExp regex = RegExp(pattern, caseSensitive: false, dotAll: true);
-      Iterable<RegExpMatch> matches = regex.allMatches(_htmlContent!);
-
-      for (RegExpMatch match in matches) {
-        String? content = match.group(group);
-        if (content != null) {
-          String cleanContent = content.trim();
-          if (cleanContent.isNotEmpty) {
-            results.add(cleanContent);
-          }
-        }
-      }
-
-      return results;
-    } catch (e) {
-      throw ParseException(
-          'Failed to parse HTML with regex pattern: $pattern', _htmlContent, e);
-    }
-  }
-
-  @override
-  SmartContent extractSmartContent() {
-    if (_htmlContent == null) {
-      throw ScraperNotInitializedException();
-    }
-    return SmartExtractor.extractAll(_htmlContent!);
-  }
-
-  @override
-  String toMarkdown() {
-    if (_htmlContent == null) {
-      throw ScraperNotInitializedException();
-    }
-    return ContentFormatter.toMarkdown(_htmlContent!);
-  }
-
-  @override
-  String toPlainText() {
-    if (_htmlContent == null) {
-      throw ScraperNotInitializedException();
-    }
-    return ContentFormatter.toPlainText(_htmlContent!);
-  }
-
-  @override
-  int getWordCount() {
-    final plainText = toPlainText();
-    return ContentFormatter.wordCount(plainText);
-  }
-
-  @override
-  Duration estimateReadingTime({int wordsPerMinute = 200}) {
-    final plainText = toPlainText();
-    return ContentFormatter.estimateReadingTime(plainText,
-        wordsPerMinute: wordsPerMinute);
-  }
-
-  // Private helper methods
-  String _buildTagPattern(String tag, {String? className, String? id}) {
-    String attributePattern = '';
-
-    if (className != null) {
-      attributePattern +=
-          '(?=.*class=["\'](?:[^"\']*\\s)?${RegExp.escape(className)}(?:\\s[^"\']*)?["\'])';
-    }
-
-    if (id != null) {
-      attributePattern += '(?=.*id=["\']${RegExp.escape(id)}["\'])';
-    }
-
-    return '<${RegExp.escape(tag)}$attributePattern[^>]*>(.*?)<\\/${RegExp.escape(tag)}>';
-  }
-
-  String _cleanHtmlContent(String content) {
-    // Remove HTML tags
-    String cleaned = content.replaceAll(RegExp(r'<[^>]*>'), '');
-
-    // Decode common HTML entities
-    cleaned = cleaned
-        .replaceAll('&amp;', '&')
-        .replaceAll('&lt;', '<')
-        .replaceAll('&gt;', '>')
-        .replaceAll('&quot;', '"')
-        .replaceAll('&#39;', "'")
-        .replaceAll('&nbsp;', ' ')
-        .replaceAll('&copy;', '©')
-        .replaceAll('&reg;', '®')
-        .replaceAll('&trade;', '™');
-
-    // Clean up whitespace
-    cleaned = cleaned.replaceAll(RegExp(r'\s+'), ' ').trim();
-
-    return cleaned;
-  }
 }
