@@ -45,41 +45,47 @@ flutter analyze && flutter test
 
 # Phase 0 — Rename & repo hygiene
 
+> ✅ **Complete** — 2026-09-02, commit `d5d96dc`, tag `v2.0.0-dev.1`.
+> Analyzer 194 → **0** issues. Publish dry-run **0** warnings. Both platforms build.
+> Test results unchanged (74 pass / 7 fail, identical before and after) — the proof that
+> nothing behavioural moved. Failures documented in `test/KNOWN_FAILURES.md`.
+> One new defect surfaced and was logged as **BUG-5** in Phase 1.2.
+
 **Goal:** a correctly-shaped package under the new name, with no behaviour change and version
 control in place. Nothing here should alter what the library *does*.
 
 ### 0.1 Version control (do this first)
 
-- [ ] `git init` in the project root — this fork currently has no history at all
-- [ ] Verify `.gitignore` covers `build/`, `.dart_tool/`, `*.iml`, `.flutter-plugins*`, `**/Pods/`
-- [ ] Commit the untouched fork as the baseline: `chore: import flutter_scrapper 1.1.0 fork`
-- [ ] Create branch `feat/ai-scrapper-2.0` and work there
+- [x] `git init` in the project root — this fork currently has no history at all
+- [x] Verify `.gitignore` covers `build/`, `.dart_tool/`, `*.iml`, `.flutter-plugins*`, `**/Pods/`
+- [x] Commit the untouched fork as the baseline: `chore: import flutter_scrapper 1.1.0 fork`
+- [x] Create branch `feat/ai-scrapper-2.0` and work there
       <br>**Acceptance:** `git log` shows a baseline commit you can diff every later change against.
 
 ### 0.2 Rename the package
 
-- [ ] `pubspec.yaml`: `name: flutter_ai_scrapper`, `version: 2.0.0-dev.1`
-- [ ] `pubspec.yaml`: rewrite `description` (pub.dev shows the first 180 chars — make them count)
-- [ ] `pubspec.yaml`: update `repository` / `homepage`, add `issue_tracker`
-- [ ] `pubspec.yaml`: add `topics: [scraping, html, ai, on-device, gemma]`
-- [ ] `pubspec.yaml`: add an explicit platform declaration so pub.dev states the limit:
+- [x] `pubspec.yaml`: `name: flutter_ai_scrapper`, `version: 2.0.0-dev.1`
+- [x] `pubspec.yaml`: rewrite `description` (pub.dev shows the first 180 chars — make them count)
+- [x] `pubspec.yaml`: update `repository` / `homepage`, add `issue_tracker`
+- [x] `pubspec.yaml`: add `topics: [scraping, html, ai, on-device, gemma]`
+- [x] `pubspec.yaml`: add an explicit platform declaration so pub.dev states the limit:
       ```yaml
       platforms:
         android:
         ios:
       ```
-- [ ] Bump SDK constraints to `sdk: '>=3.12.0 <4.0.0'`, `flutter: '>=3.44.0'`
-- [ ] Find/replace `package:flutter_scrapper/` → `package:flutter_ai_scrapper/` across `test/` and docs
+- [x] Bump SDK constraints to `sdk: '>=3.12.0 <4.0.0'`, `flutter: '>=3.44.0'`
+- [x] Find/replace `package:flutter_scrapper/` → `package:flutter_ai_scrapper/` across `test/` and docs
       <br>**Acceptance:** `flutter pub get` resolves; no reference to `flutter_scrapper` remains outside `CHANGELOG.md`.
 
 ### 0.3 Fix the package shape
 
-- [ ] Create `lib/flutter_ai_scrapper.dart` as the single barrel
-- [ ] Delete `lib/mobile_scraper.dart` and `lib/flutter_mobile_scraper.dart` as *entrypoints*
+- [x] Create `lib/flutter_ai_scrapper.dart` as the single barrel
+- [x] Delete `lib/mobile_scraper.dart` and `lib/flutter_mobile_scraper.dart` as *entrypoints*
       (the scraper class moves to `lib/src/` in P1 — for now just re-export from the barrel)
-- [ ] Move `lib/main.dart`, `lib/views/`, `lib/viewmodels/` → `example/lib/`
-- [ ] Remove `provider` from the library's `dependencies`; add it to `example/pubspec.yaml`
-- [ ] Move all remaining `lib/*.dart` and `lib/<module>/` into `lib/src/`
+- [x] Move `lib/main.dart`, `lib/views/`, `lib/viewmodels/` → `example/lib/`
+- [x] Remove `provider` from the library's `dependencies`; add it to `example/pubspec.yaml`
+- [x] Move all remaining `lib/*.dart` and `lib/<module>/` into `lib/src/`
       <br>**Acceptance:** `ls lib/` shows exactly `flutter_ai_scrapper.dart` and `src/`. Nothing in `lib/` calls `runApp`.
 
 ### 0.4 Clean up platform folders
@@ -87,37 +93,41 @@ control in place. Nothing here should alter what the library *does*.
 > A pure Flutter *package* with no native code needs no platform folders at all. Only the
 > example app does. **Inspect before deleting** — confirm nothing was hand-edited.
 
-- [ ] Delete `web/`, `windows/`, `linux/`, `macos/` from the project root
-- [ ] Delete the root `android/` and `ios/` (they belong to the old app, not the package)
-- [ ] Delete the stale `example_app/` entirely — its own `widget_test.dart` already fails to compile
-- [ ] Scaffold `example/` properly: `flutter create --template=app --platforms=android,ios example`
-- [ ] `example/pubspec.yaml`: add `flutter_ai_scrapper: {path: ../}`
+- [x] Delete `web/`, `windows/`, `linux/`, `macos/` from the project root
+- [x] Delete the root `android/` and `ios/` (they belong to the old app, not the package)
+- [x] Delete the stale `example_app/` entirely — its own `widget_test.dart` already fails to compile
+- [x] Scaffold `example/` properly: `flutter create --template=app --platforms=android,ios example`
+- [x] `example/pubspec.yaml`: add `flutter_ai_scrapper: {path: ../}`
       <br>**Acceptance:** `cd example && flutter build apk --debug` succeeds.
 
 ### 0.5 Raise the platform floors
 
-- [ ] `example/android/app/build.gradle.kts`: `minSdk = 24`, `compileSdk = 36`
-- [ ] `example/ios/Podfile`: `platform :ios, '15.0'`
-- [ ] `example/ios/Runner.xcodeproj`: `IPHONEOS_DEPLOYMENT_TARGET = 15.0`
-- [ ] Correct the README's platform claims (it currently advertises API 21 / iOS 12 — flutter_gemma cannot honour either)
+- [x] `example/android/app/build.gradle.kts`: `minSdk = 24`, `compileSdk = 36`
+- [x] `example/ios/Podfile`: `platform :ios, '15.0'`
+- [x] `example/ios/Runner.xcodeproj`: `IPHONEOS_DEPLOYMENT_TARGET = 15.0`
+- [x] Correct the README's platform claims (it currently advertises API 21 / iOS 12 — flutter_gemma cannot honour either)
       <br>**Acceptance:** both platforms build; README matches reality.
 
 ### 0.6 Stabilise the test suite
 
-- [ ] Run `flutter test` and record the 7 current failures in `test/KNOWN_FAILURES.md`
-- [ ] For each: decide **fix now** vs **supersede in P1** and note which
-- [ ] Fix the 5 `unnecessary_string_escapes` analyzer warnings in `lib/src/`
-- [ ] Silence `avoid_print` in tests (add a `analysis_options.yaml` test override, or use a logger)
-- [ ] Add `dart_code_metrics` or tighten `analysis_options.yaml` with `strict-casts`, `strict-raw-types`
+- [x] Run `flutter test` and record the 7 current failures in `test/KNOWN_FAILURES.md`
+- [x] For each: decide **fix now** vs **supersede in P1** and note which
+- [x] Fix the 5 `unnecessary_string_escapes` analyzer warnings in `lib/src/`
+- [x] Silence `avoid_print` in tests (add a `analysis_options.yaml` test override, or use a logger)
+- [x] Tightened `analysis_options.yaml`: `strict-casts`, `strict-raw-types`, `strict-inference`
+      plus correctness lints. Skipped `dart_code_metrics` — the built-in analyzer covers this.
       <br>**Acceptance:** `flutter analyze` reports **0 issues**.
 
 ### ✅ Exit gate — Phase 0
 
-- [ ] `flutter analyze` → 0 issues
-- [ ] `flutter test` → all green (or every failure listed in `KNOWN_FAILURES.md` with a P1 owner)
-- [ ] `flutter pub publish --dry-run` → no structural complaints
-- [ ] `cd example && flutter run` works on an Android device and an iOS device
-- [ ] Tag `v2.0.0-dev.1`
+- [x] `flutter analyze` → 0 issues
+- [x] `flutter test` → all green (or every failure listed in `KNOWN_FAILURES.md` with a P1 owner)
+- [x] `flutter pub publish --dry-run` → no structural complaints
+- [~] `cd example && flutter run` — installs, launches and runs clean on a physical Android
+      device (CPH2591, API 35): live PID, zero fatal/Flutter errors in logcat. Could not
+      *visually* confirm the UI because the device is lock-screened. iOS builds for device
+      (`flutter build ios --no-codesign`); only a wireless iPad is paired, so no on-device run.
+- [x] Tag `v2.0.0-dev.1`
 
 ---
 
