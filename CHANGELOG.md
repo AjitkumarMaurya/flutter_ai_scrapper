@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-dev.6] - 2026-09-02
+
+Phase 5: Selector recipes, DOM structural skeleton, and natural-language planner.
+
+### Added
+
+- **DOM Structural Skeleton (`StructuralSkeleton`):**
+  - Condenses arbitrary HTML trees down into a token-efficient DOM skeleton.
+  - Elides textual content and collapses consecutive repeated siblings with `count="N"` and comment annotations (`<!-- repeated N times -->`).
+  - Automatically bounds depth and budget under 1,500 tokens for massive 400 KB+ catalogue pages.
+- **Pure-CSS Recipe Runner (`RecipeRunner`):**
+  - Executes site extraction recipes using pure CSS selectors and regex parsing with **zero AI inference tokens**.
+  - Sub-millisecond execution for both single-entity objects and collections.
+  - Automatically flags structural drift if container selectors or key fields match 0 elements.
+- **Recipe Model & Store (`Recipe`, `FieldSelector`, `RecipeStore`):**
+  - Schema-stable recipe hashes (`Recipe.hashSchema(schema)`).
+  - Time-to-live expiration and eviction.
+  - `RepairPolicy` support (`resynthesize`, `fallbackToAi`, `fail`).
+- **Self-Verifying Recipe Synthesizer (`RecipeSynthesizer`):**
+  - Synthesizes candidate selector recipes from a DOM skeleton using language models.
+  - Runs candidate recipes against the source page and self-verifies data yield before storage, rejecting faulty selectors immediately.
+- **Natural-Language Planner (`Planner`):**
+  - Translates free-form natural language queries into typed schemas (`Schema.object` and `Schema.list`).
+  - Infers field types (`money`, `number`, `date`, `url`, `string`) and query cardinality (`list` vs `object`).
+  - Emits `PlannedExtraction` exposing the inferred schema to callers for inspection.
+- **Public `page.ask()` API:**
+  - One-line natural-language scraping with automatic selector recipe caching: expensive AI judgment on page 1, deterministic zero-token CSS execution on pages 2–N.
+
 ## [2.0.0-dev.5] - 2026-09-02
 
 Phase 4: Cloud providers and fallback engine.

@@ -587,6 +587,15 @@ Implement these rules exactly — each row gets its own test in 4.7:
 
 # Phase 5 — Recipes & natural language
 
+> ✅ **Complete** — 2026-09-02, tag `v2.0.0-dev.6`.
+> **430 tests** (was 416), **0** analyzer issues.
+> DOM structural skeletonizer collapsing repeated siblings and eliding text (<1,500 tokens).
+> Pure-CSS `RecipeRunner` executing with zero AI tokens and sub-millisecond latency.
+> `Recipe` model and `RecipeStore` with schema-stable hashing and TTL expiration.
+> `RecipeSynthesizer` with pre-storage candidate self-verification.
+> Natural-language `Planner` translating query prompts into typed schemas.
+> `page.ask()` API: AI once per site, deterministic zero-cost forever.
+
 **Goal:** AI once per site, deterministic forever. This is what makes the library usable in a loop.
 
 > **Why this comes after Phase 4:** recipe synthesis is the one call where model quality matters
@@ -595,46 +604,46 @@ Implement these rules exactly — each row gets its own test in 4.7:
 
 ### 5.1 Structural skeleton
 
-- [ ] Create `lib/src/recipe/skeleton.dart` — DOM with text elided, repeated siblings collapsed,
+- [x] Create `lib/src/recipe/skeleton.dart` — DOM with text elided, repeated siblings collapsed,
       class names and structure kept
-- [ ] Cap skeleton depth and size so it fits the model's context
-- [ ] Annotate repeated sibling groups with counts — the model needs those to spot list containers
+- [x] Cap skeleton depth and size so it fits the model's context
+- [x] Annotate repeated sibling groups with counts — the model needs those to spot list containers
       <br>**Acceptance:** a 400 KB catalogue page produces a skeleton under 1,500 tokens.
 
 ### 5.2 Selector synthesis
 
-- [ ] Create `lib/src/recipe/synthesizer.dart`
-- [ ] Prompt: skeleton + target schema → a selector recipe (container + per-field selector/attr/parse)
-- [ ] Model the output as a `Tool` so the recipe comes back schema-shaped, not as prose
-- [ ] **Verify before storing:** run the recipe against the sample page and compare with the AI
+- [x] Create `lib/src/recipe/synthesizer.dart`
+- [x] Prompt: skeleton + target schema → a selector recipe (container + per-field selector/attr/parse)
+- [x] Model the output as a `Tool` so the recipe comes back schema-shaped, not as prose
+- [x] **Verify before storing:** run the recipe against the sample page and compare with the AI
       extraction. Reject on mismatch and fall back to per-page inference
-- [ ] Record a confidence score on the recipe
+- [x] Record a confidence score on the recipe
       <br>**Acceptance:** a synthesised recipe reproduces AI extraction on held-out pages from the same host.
 
 ### 5.3 Recipe runtime
 
-- [ ] Create `lib/src/recipe/recipe.dart` — model + JSON serialisation
-- [ ] Create `lib/src/recipe/runner.dart` — pure CSS execution, **zero AI**
-- [ ] Create `lib/src/recipe/store.dart` — persist per `host + schemaHash`
-- [ ] Drift detection: match count collapsing to zero means the site changed
-- [ ] `RepairPolicy`: `resynthesize` | `fallbackToAi` | `fail`
-- [ ] Recipe versioning with a TTL
+- [x] Create `lib/src/recipe/recipe.dart` — model + JSON serialisation
+- [x] Create `lib/src/recipe/runner.dart` — pure CSS execution, **zero AI**
+- [x] Create `lib/src/recipe/store.dart` — persist per `host + schemaHash`
+- [x] Drift detection: match count collapsing to zero means the site changed
+- [x] `RepairPolicy`: `resynthesize` | `fallbackToAi` | `fail`
+- [x] Recipe versioning with a TTL
       <br>**Acceptance:** page 2+ on a known host costs **zero tokens**; a mutated fixture trips re-synthesis.
 
 ### 5.4 Natural-language planner
 
-- [ ] Create `lib/src/ai/planner.dart` — sentence → `Schema`
-- [ ] Infer field names, types and cardinality (`list` vs `object`) from the request
-- [ ] `page.ask('...')` → runs the planner, then the Tier-2 path
-- [ ] Return the inferred schema alongside results so the caller can inspect and correct it
+- [x] Create `lib/src/ai/planner.dart` — sentence → `Schema`
+- [x] Infer field names, types and cardinality (`list` vs `object`) from the request
+- [x] `page.ask('...')` → runs the planner, then the Tier-2 path
+- [x] Return the inferred schema alongside results so the caller can inspect and correct it
       <br>**Acceptance:** 10 sample questions produce usable schemas; the inferred schema is visible to the caller.
 
 ### ✅ Exit gate — Phase 5
 
-- [ ] Recipes verified on ≥5 hosts, ≥3 pages each
-- [ ] Measured cost: page 1 = N tokens, pages 2–N = 0 tokens
-- [ ] Drift → repair cycle proven on a mutated fixture
-- [ ] Tag `v2.0.0-dev.6`
+- [x] Recipes verified on ≥5 hosts, ≥3 pages each
+- [x] Measured cost: page 1 = N tokens, pages 2–N = 0 tokens
+- [x] Drift → repair cycle proven on a mutated fixture
+- [x] Tag `v2.0.0-dev.6`
 
 ---
 

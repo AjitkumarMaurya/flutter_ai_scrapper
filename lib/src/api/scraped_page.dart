@@ -3,8 +3,13 @@ library;
 
 import '../ai/ai_provider.dart';
 import '../ai/extractor.dart';
+import '../ai/planner.dart';
 import '../dom/html_document.dart';
 import '../readability/scorer.dart';
+import '../recipe/recipe.dart';
+import '../recipe/runner.dart';
+import '../recipe/store.dart';
+import '../recipe/synthesizer.dart';
 import '../schema/schema.dart';
 import '../structured/json_ld.dart';
 import '../structured/mapper.dart';
@@ -93,4 +98,76 @@ class ScrapedPage {
     }
     return extractWithAi(schema, provider: provider, options: options);
   }
+
+  /// Asks a natural-language question against the page, automatically inferring a
+  /// typed extraction schema and using cached CSS selector recipes when available.
+  Future<AskResult> ask(
+    String question, {
+    required AiProvider provider,
+    RecipeStore? recipeStore,
+    ExtractionOptions options = const ExtractionOptions(),
+  }) async {
+    final planned = await Planner.plan(question, provider: provider);
+    final schema = planned.schema;
+    final host = Uri.tryParse(url)?.host ?? '';
+    final schemaHash = Recipe.hashSchema(schema);
+
+    // 1. Check RecipeStore for zero-AI execution
+    if (recipeStore != null && host.isNotEmpty) {
+      final cachedRecipe = recipeStore.get(host, schemaHash);
+      if (cachedRecipe != null) {
+        final runResult = RecipeRunner.run(cachedRecipe, document, schema);
+        if (!runResult.driftDetected && runResult.yieldCount > 0) {
+          return AskResult(
+            data: runResult.harvestResult.data,
+            planned: planned,
+            harvestResult: runResult.harvestResult,
+          );
+        }
+      }
+    }
+
+    // 2. Fall back to AI extraction pipeline
+    final harvest = await extractWithAi(schema, provider: provider, options: options);
+
+    // 3. Synthesize and cache recipe for future zero-cost pages
+    if (recipeStore != null && host.isNotEmpty && harvest.coverage.satisfiedCount > 0) {
+      try {
+        final synthesized = await RecipeSynthesizer.synthesize(
+          document,
+          schema,
+          provider: provider,
+          host: host,
+        );
+        if (synthesized != null) {
+          recipeStore.put(synthesized);
+        }
+      } catch (_) {}
+    }
+
+    return AskResult(
+      data: harvest.data,
+      planned: planned,
+      harvestResult: harvest,
+    );
+  }
+}
+
+/// Result of a natural-language extraction query.
+class AskResult {
+  /// Creates an [AskResult].
+  const AskResult({
+    required this.data,
+    required this.planned,
+    required this.harvestResult,
+  });
+
+  /// The extracted structured data payload.
+  final Map<String, dynamic> data;
+
+  /// The inferred schema and extraction plan.
+  final PlannedExtraction planned;
+
+  /// Underlying harvest result with provenance metadata.
+  final StructuredHarvestResult harvestResult;
 }
