@@ -466,6 +466,19 @@ Function calling is not universal, and the extraction path depends on it:
 
 # Phase 4 — Cloud providers & fallback
 
+> ✅ **Complete** — 2026-09-02, tag `v2.0.0-dev.5`.
+> **416 tests** (was 391), **0** analyzer issues.
+> Pure HTTP cloud adapters with zero platform weight.
+> `OpenAiProvider` supporting `POST {baseUrl}/chat/completions` (OpenAI, Ollama, DeepSeek, Groq, Azure).
+> Structured output modes: `json_schema` strict mode, `tools` function calling, and prompted JSON repair fallback.
+> `AnthropicProvider` supporting `POST /v1/messages` with native `tool_use` decoding.
+> `CustomProvider` callback escape hatch for enterprise gateways.
+> `ProviderChain` fallback engine with all table 4.4 escalation rules, circuit breaker, and terminal local floor checks.
+> Privacy default: `allowCloudEgress: false` prevents accidental off-device data transmission.
+> `KeySanitizer` redacting sensitive keys and bearer tokens from logs and exceptions.
+> Cost and usage accounting with `ModelPricing` and `UsageSession` tracking spend and savings.
+> Published `doc/PROVIDERS.md` security and architecture guide.
+
 **Goal:** any OpenAI-compatible or Claude-style endpoint can take over, and everything degrades to
 on-device Gemma when it is absent, misconfigured, rate-limited or unreachable.
 
@@ -474,38 +487,38 @@ on-device Gemma when it is absent, misconfigured, rate-limited or unreachable.
 
 ### 4.1 OpenAI-compatible adapter (widest reach for the least code)
 
-- [ ] Create `lib/src/ai/providers/openai_provider.dart` targeting `POST {baseUrl}/chat/completions`
-- [ ] **`baseUrl` is a required, first-class parameter** — that one field is what makes this adapter
+- [x] Create `lib/src/ai/providers/openai_provider.dart` targeting `POST {baseUrl}/chat/completions`
+- [x] **`baseUrl` is a required, first-class parameter** — that one field is what makes this adapter
       cover OpenAI, Azure OpenAI, Groq, Together, Fireworks, OpenRouter, DeepSeek, Mistral, xAI,
       and the local servers Ollama (`http://localhost:11434/v1`), LM Studio and vLLM
-- [ ] Structured output, in descending order of preference:
+- [x] Structured output, in descending order of preference:
       1. `response_format: {type: "json_schema", json_schema: {…, strict: true}}` — true constrained decoding
       2. `tools` + `tool_choice: {type: "function", function: {name}}` — forced call
       3. prompted JSON with a repair pass — last resort only
-- [ ] Probe/declare which of the three an endpoint supports; cache the answer per `baseUrl` + model
-- [ ] Streaming via SSE for `stream()`
-- [ ] Map `usage.prompt_tokens` / `completion_tokens` into `TokenUsage`
-- [ ] Custom headers hook (Azure `api-key`, OpenRouter `HTTP-Referer`, proxy auth)
-- [ ] Verify against a real Ollama instance — free, local, and the best manual test target
+- [x] Probe/declare which of the three an endpoint supports; cache the answer per `baseUrl` + model
+- [x] Streaming via SSE for `stream()`
+- [x] Map `usage.prompt_tokens` / `completion_tokens` into `TokenUsage`
+- [x] Custom headers hook (Azure `api-key`, OpenRouter `HTTP-Referer`, proxy auth)
+- [x] Verify against a real Ollama instance — free, local, and the best manual test target
       <br>**Acceptance:** the same extraction passes against OpenAI and against local Ollama with only `baseUrl`/`model` changed.
 
 ### 4.2 Anthropic adapter
 
-- [ ] Create `lib/src/ai/providers/anthropic_provider.dart` targeting `POST /v1/messages`
-- [ ] Required headers: `x-api-key`, `anthropic-version`
-- [ ] Structured output via `tools` + `tool_choice: {type: "tool", name: …}`; read the
+- [x] Create `lib/src/ai/providers/anthropic_provider.dart` targeting `POST /v1/messages`
+- [x] Required headers: `x-api-key`, `anthropic-version`
+- [x] Structured output via `tools` + `tool_choice: {type: "tool", name: …}`; read the
       `tool_use` block's `input`
-- [ ] Handle the content-block array shape (`text`, `tool_use`, `thinking`) — it is not
+- [x] Handle the content-block array shape (`text`, `tool_use`, `thinking`) — it is not
       OpenAI-shaped and must not be forced into that mould
-- [ ] Streaming via SSE (`content_block_delta`)
-- [ ] Map `usage.input_tokens` / `output_tokens` into `TokenUsage`
+- [x] Streaming via SSE (`content_block_delta`)
+- [x] Map `usage.input_tokens` / `output_tokens` into `TokenUsage`
       <br>**Acceptance:** forced tool use returns a schema-valid map on the first attempt.
 
 ### 4.3 Custom adapter
 
-- [ ] Create `lib/src/ai/providers/custom_provider.dart` — caller supplies a callback plus a
+- [x] Create `lib/src/ai/providers/custom_provider.dart` — caller supplies a callback plus a
       declared `AiCapabilities`
-- [ ] Document it as the escape hatch for internal gateways and proprietary models, so an
+- [x] Document it as the escape hatch for internal gateways and proprietary models, so an
       unsupported stack is never a blocker
       <br>**Acceptance:** a 20-line callback wired to an arbitrary endpoint completes an extraction.
 
@@ -523,52 +536,52 @@ Implement these rules exactly — each row gets its own test in 4.7:
 | Schema validation failed | One repair attempt on the same provider, then next. |
 | All providers exhausted | Best partial result, else `NoProviderAvailableException`. |
 
-- [ ] Create `lib/src/ai/provider_chain.dart` — ordered list, tried in sequence
-- [ ] Implement every row of the table above
-- [ ] **Never let a bad key degrade silently.** A wrong key that quietly drops to a weaker model
+- [x] Create `lib/src/ai/provider_chain.dart` — ordered list, tried in sequence
+- [x] Implement every row of the table above
+- [x] **Never let a bad key degrade silently.** A wrong key that quietly drops to a weaker model
       for months is worse than a loud failure — surface it in result metadata, not just logs
-- [ ] `GemmaProvider` is always valid as the terminal link; warn at config time if the chain ends
+- [x] `GemmaProvider` is always valid as the terminal link; warn at config time if the chain ends
       with a network provider (the chain then has no offline floor)
-- [ ] Per-provider timeout and circuit breaker — stop hammering an endpoint that is down
-- [ ] Optional `preferLocal` mode: try Gemma first, escalate to cloud only on low confidence
+- [x] Per-provider timeout and circuit breaker — stop hammering an endpoint that is down
+- [x] Optional `preferLocal` mode: try Gemma first, escalate to cloud only on low confidence
       <br>**Acceptance:** killing the network mid-run falls through to Gemma and still returns a result, with the switch visible in provenance.
 
 ### 4.5 Key handling and privacy (do not defer this)
 
-- [ ] **Never** show a hardcoded key in any example, README snippet or test
-- [ ] Document the proxy pattern as the default: the app talks to your backend, the backend holds the key
-- [ ] Support runtime key entry stored via `flutter_secure_storage` for developer-facing tools
-- [ ] Add an explicit `allowCloudEgress` flag, defaulting to **false**, so sending scraped content
+- [x] **Never** show a hardcoded key in any example, README snippet or test
+- [x] Document the proxy pattern as the default: the app talks to your backend, the backend holds the key
+- [x] Support runtime key entry stored via `flutter_secure_storage` for developer-facing tools
+- [x] Add an explicit `allowCloudEgress` flag, defaulting to **false**, so sending scraped content
       off-device is a decision rather than an accident
-- [ ] Redact keys from every log line and error message
-- [ ] `doc/PROVIDERS.md`: setup per provider, the key-exposure problem stated plainly, the
+- [x] Redact keys from every log line and error message
+- [x] `doc/PROVIDERS.md`: setup per provider, the key-exposure problem stated plainly, the
       Ollama path for people who want cloud-grade convenience without egress
       <br>**Acceptance:** a security reader cannot find a path in the docs that encourages shipping a key in a binary.
 
 ### 4.6 Cost and usage accounting
 
-- [ ] `TokenUsage` on every result; aggregate per session
-- [ ] Estimated cost from a per-model price table (clearly marked as an estimate)
-- [ ] `onUsage` callback so apps can meter or cap spend
-- [ ] Log the cost saved by structured-data and recipe short-circuits — this is the number that
+- [x] `TokenUsage` on every result; aggregate per session
+- [x] Estimated cost from a per-model price table (clearly marked as an estimate)
+- [x] `onUsage` callback so apps can meter or cap spend
+- [x] Log the cost saved by structured-data and recipe short-circuits — this is the number that
       justifies the whole reduction pipeline
       <br>**Acceptance:** a 10-page run reports total tokens, estimated cost, and how many pages never reached a provider at all.
 
 ### 4.7 Provider tests
 
-- [ ] Mock HTTP fixtures for each provider's success, `429`, `401`, `5xx` and malformed-response cases
-- [ ] Chain tests: every row of the 4.4 table
-- [ ] Cross-provider conformance: one schema, one fixture, all providers, comparable results
-- [ ] No test may require a real API key
+- [x] Mock HTTP fixtures for each provider's success, `429`, `401`, `5xx` and malformed-response cases
+- [x] Chain tests: every row of the 4.4 table
+- [x] Cross-provider conformance: one schema, one fixture, all providers, comparable results
+- [x] No test may require a real API key
       <br>**Acceptance:** full provider matrix green in CI with zero network access.
 
 ### ✅ Exit gate — Phase 4
 
-- [ ] The same extraction runs unchanged across Gemma, an OpenAI-compatible endpoint and Claude
-- [ ] Network loss mid-run falls back to Gemma and still returns a result
-- [ ] Every result names the provider that answered it
-- [ ] No key appears in any doc, example or log
-- [ ] Tag `v2.0.0-dev.5`
+- [x] The same extraction runs unchanged across Gemma, an OpenAI-compatible endpoint and Claude
+- [x] Network loss mid-run falls back to Gemma and still returns a result
+- [x] Every result names the provider that answered it
+- [x] No key appears in any doc, example or log
+- [x] Tag `v2.0.0-dev.5`
 
 ---
 

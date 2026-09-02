@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-dev.5] - 2026-09-02
+
+Phase 4: Cloud providers and fallback engine.
+
+### Added
+
+- **OpenAI-compatible adapter (`OpenAiProvider`):**
+  - Targets `POST {baseUrl}/chat/completions` with first-class `baseUrl` parameter covering OpenAI, Azure, Groq, Together, Fireworks, OpenRouter, DeepSeek, Mistral, xAI, Ollama, LM Studio, and vLLM.
+  - Three structured output modes: `json_schema` strict mode, `tools` function calling, and prompted JSON repair fallback.
+  - Endpoint capability caching per `baseUrl` + model.
+  - SSE token streaming.
+- **Anthropic adapter (`AnthropicProvider`):**
+  - Targets `POST {baseUrl}/v1/messages` with `tools` + `tool_choice` forced function calling.
+  - Direct decoding of `tool_use` content blocks and `content_block_delta` SSE streaming.
+- **Custom adapter (`CustomProvider`):**
+  - Allows wrapping arbitrary functions or enterprise API gateways into an `AiProvider`.
+- **Fallback engine (`ProviderChain`):**
+  - Ordered fallback with exact failure escalation: handles unconfigured providers, offline/network errors, 429 rate limits (with backoff), 5xx server errors (with retry), and 401/403 auth errors (loud warnings).
+  - Terminal fallback to on-device Gemma with configuration warnings when an offline floor is absent.
+  - Per-provider circuit breaker to stop hammering down endpoints.
+  - `preferLocal` mode prioritizing on-device inference before cloud escalation.
+- **Privacy & security controls:**
+  - `allowCloudEgress: false` by default, ensuring zero scraped content is sent off-device without explicit opt-in.
+  - `KeySanitizer` redacts sensitive API keys and bearer tokens from all logs and error strings.
+  - Published comprehensive security guide in `doc/PROVIDERS.md` emphasizing the backend proxy pattern.
+- **Cost & usage accounting (`cost_tracker.dart`):**
+  - `ModelPricing` per-model price catalog.
+  - `UsageSession` aggregating prompt/completion tokens, dollar spend, and savings from deterministic short-circuits.
+
 ## [2.0.0-dev.4] - 2026-09-02
 
 Phase 3: AI Provider layer and on-device Gemma integration.
