@@ -43,3 +43,17 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# CocoaPods
+**/Pods/
+**/ios/Podfile.lock
+**/macos/Podfile.lock
+
+# Build output (any depth, not just root)
+**/build/
+
+# Local env / secrets — never commit provider API keys
+.env
+.env.*
+*.keystore
+key.properties
