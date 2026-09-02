@@ -71,6 +71,8 @@ class DemoHomeScreen extends StatefulWidget {
 class _DemoHomeScreenState extends State<DemoHomeScreen> {
   int _currentTierIndex = 0;
   final ModelManager _modelManager = ModelManager();
+  bool _quickScrapeBusy = false;
+  String? _quickScrapeError;
   final RecipeStore _recipeStore = RecipeStore();
   late final ProviderChain _chain;
 
@@ -79,7 +81,7 @@ class _DemoHomeScreenState extends State<DemoHomeScreen> {
     super.initState();
     _chain = ProviderChain(
       providers: [
-        GemmaProvider(manager: _modelManager),
+        GemmaProvider(),
         OpenAiProvider(
           baseUrl: 'http://localhost:11434/v1',
           model: 'llama3',
@@ -173,26 +175,86 @@ class _DemoHomeScreenState extends State<DemoHomeScreen> {
           ),
           const SizedBox(height: 16.0),
           ElevatedButton.icon(
-            icon: const Icon(Icons.download),
-            label: const Text('Scrape Sample (Hacker News)'),
-            onPressed: () async {
-              final page = await AiScrapper.scrape('https://news.ycombinator.com');
-              if (context.mounted) {
-                showDialog(
-                  context: context,
-                  builder: (_) => AlertDialog(
-                    title: Text(page.title ?? 'Parsed Page'),
-                    content: SingleChildScrollView(
-                      child: Text('Word count: ${page.document.select("a").length} links found.'),
-                    ),
-                  ),
-                );
-              }
-            },
+            icon: _quickScrapeBusy
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.download),
+            label: Text(
+              _quickScrapeBusy
+                  ? 'Scraping…'
+                  : 'Scrape Sample (Hacker News)',
+            ),
+            onPressed: _quickScrapeBusy ? null : _runQuickScrape,
           ),
+          if (_quickScrapeBusy) ...[
+            const SizedBox(height: 12.0),
+            // Hacker News asks for a 30-second Crawl-delay in its robots.txt,
+            // and the library honours it. Without saying so, correct polite
+            // behaviour is indistinguishable from a hang.
+            Text(
+              'Honouring this site\'s robots.txt crawl-delay. '
+              'Hacker News asks for 30 seconds between requests.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+          if (_quickScrapeError != null) ...[
+            const SizedBox(height: 12.0),
+            Container(
+              padding: const EdgeInsets.all(12.0),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.errorContainer,
+                borderRadius: BorderRadius.circular(8.0),
+              ),
+              child: Text(
+                _quickScrapeError!,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onErrorContainer,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  Future<void> _runQuickScrape() async {
+    setState(() {
+      _quickScrapeBusy = true;
+      _quickScrapeError = null;
+    });
+
+    try {
+      final page = await AiScrapper.scrape('https://news.ycombinator.com');
+      if (!mounted) return;
+
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(page.title ?? 'Parsed Page'),
+          content: SingleChildScrollView(
+            child: Text('${page.links.length} links found.'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+    } on ScraperException catch (error) {
+      // Every ScraperException carries a userMessage safe to show a person;
+      // toString() is for logs.
+      if (mounted) setState(() => _quickScrapeError = error.userMessage);
+    } on Object catch (error) {
+      if (mounted) setState(() => _quickScrapeError = 'Unexpected error: $error');
+    } finally {
+      if (mounted) setState(() => _quickScrapeBusy = false);
+    }
   }
 
   Widget _buildSchemaTab() {

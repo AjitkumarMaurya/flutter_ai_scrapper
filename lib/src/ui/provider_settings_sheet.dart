@@ -5,11 +5,7 @@ import '../ai/provider_chain.dart';
 /// Modal bottom sheet to configure cloud and local AI providers.
 class ProviderSettingsSheet extends StatefulWidget {
   /// Creates a [ProviderSettingsSheet].
-  const ProviderSettingsSheet({
-    super.key,
-    required this.chain,
-    this.onChanged,
-  });
+  const ProviderSettingsSheet({super.key, required this.chain, this.onChanged});
 
   /// The active [ProviderChain] being edited.
   final ProviderChain chain;
@@ -58,7 +54,8 @@ class _ProviderSettingsSheetState extends State<ProviderSettingsSheet> {
 
     setState(() {
       _isTesting = false;
-      _testStatus = 'Chain active: ${widget.chain.providers.length} providers registered.';
+      _testStatus =
+          'Chain active: ${widget.chain.providers.length} providers registered.';
     });
   }
 
@@ -73,74 +70,83 @@ class _ProviderSettingsSheetState extends State<ProviderSettingsSheet> {
         color: colorScheme.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24.0)),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.tune, color: colorScheme.primary),
-              const SizedBox(width: 12.0),
-              Text(
-                'AI Provider Settings',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
+      // One scroll surface for the whole sheet. A bottom sheet gets whatever
+      // height the viewport allows, and at 320dp the header, egress card and
+      // provider list wrap onto enough lines to exceed it — this overflowed by
+      // 76px. Scrolling the lot is better than clipping any of it, since the
+      // egress toggle is a security control the user must be able to reach.
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.tune, color: colorScheme.primary),
+                const SizedBox(width: 12.0),
+
+                // Expanded so a long title cannot push the close button off-screen.
+                Expanded(
+                  child: Text(
+                    'AI Provider Settings',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12.0),
+            Card(
+              elevation: 0,
+              color: colorScheme.surfaceContainerHighest,
+              child: Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Column(
+                  children: [
+                    SwitchListTile(
+                      dense: true,
+                      title: const Text('Allow Cloud Egress'),
+                      subtitle: const Text(
+                        'When disabled, all data remains strictly on-device. No scraped HTML or fields are sent to third-party endpoints.',
+                      ),
+                      value: _allowCloudEgress,
+                      onChanged: (val) {
+                        setState(() => _allowCloudEgress = val);
+                        widget.onChanged?.call();
+                      },
+                    ),
+                    SwitchListTile(
+                      dense: true,
+                      title: const Text('Prefer On-Device (Local First)'),
+                      subtitle: const Text(
+                        'Attempts extraction with Gemma first, escalating to cloud endpoints only on low confidence.',
+                      ),
+                      value: _preferLocal,
+                      onChanged: (val) {
+                        setState(() => _preferLocal = val);
+                        widget.onChanged?.call();
+                      },
+                    ),
+                  ],
                 ),
               ),
-              const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.close),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12.0),
-          Card(
-            elevation: 0,
-            color: colorScheme.surfaceContainerHighest,
-            child: Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
-                children: [
-                  SwitchListTile(
-                    dense: true,
-                    title: const Text('Allow Cloud Egress'),
-                    subtitle: const Text(
-                      'When disabled, all data remains strictly on-device. No scraped HTML or fields are sent to third-party endpoints.',
-                    ),
-                    value: _allowCloudEgress,
-                    onChanged: (val) {
-                      setState(() => _allowCloudEgress = val);
-                      widget.onChanged?.call();
-                    },
-                  ),
-                  SwitchListTile(
-                    dense: true,
-                    title: const Text('Prefer On-Device (Local First)'),
-                    subtitle: const Text(
-                      'Attempts extraction with Gemma first, escalating to cloud endpoints only on low confidence.',
-                    ),
-                    value: _preferLocal,
-                    onChanged: (val) {
-                      setState(() => _preferLocal = val);
-                      widget.onChanged?.call();
-                    },
-                  ),
-                ],
+            ),
+            const SizedBox(height: 12.0),
+            Text(
+              'Configured Providers (${widget.chain.providers.length})',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
               ),
             ),
-          ),
-          const SizedBox(height: 12.0),
-          Text(
-            'Configured Providers (${widget.chain.providers.length})',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8.0),
-          Flexible(
-            child: ListView.builder(
+            const SizedBox(height: 8.0),
+            ListView.builder(
               shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
               itemCount: widget.chain.providers.length,
               itemBuilder: (context, index) {
                 final provider = widget.chain.providers[index];
@@ -166,29 +172,29 @@ class _ProviderSettingsSheetState extends State<ProviderSettingsSheet> {
                 );
               },
             ),
-          ),
-          if (_testStatus != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0),
-              child: Text(
-                _testStatus!,
-                style: TextStyle(color: colorScheme.primary),
-                textAlign: TextAlign.center,
+            if (_testStatus != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                child: Text(
+                  _testStatus!,
+                  style: TextStyle(color: colorScheme.primary),
+                  textAlign: TextAlign.center,
+                ),
               ),
+            const SizedBox(height: 12.0),
+            FilledButton.icon(
+              icon: _isTesting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.check_circle_outline),
+              label: const Text('Test Chain Connection'),
+              onPressed: _isTesting ? null : _testConnection,
             ),
-          const SizedBox(height: 12.0),
-          FilledButton.icon(
-            icon: _isTesting
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.check_circle_outline),
-            label: const Text('Test Chain Connection'),
-            onPressed: _isTesting ? null : _testConnection,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

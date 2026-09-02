@@ -2,6 +2,7 @@ import 'package:flutter_ai_scrapper/flutter_ai_scrapper.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  _egressTests();
   group('ProviderChain Resilience & Fallback Engine', () {
     final testSchema = Schema.object({
       'name': const Field.string(),
@@ -215,6 +216,64 @@ void main() {
       expect(redacted, isNot(contains('sk-998877665544332211')));
       expect(redacted, contains('Bearer [REDACTED]'));
       expect(redacted, contains('sk-9...[REDACTED]'));
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Egress gating — added after a device-testing review found `isLocal`
+// defaulting to `true`, which silently exempted any provider whose author
+// forgot to set it from the user's `allowCloudEgress: false` choice.
+// ---------------------------------------------------------------------------
+
+class _UndeclaredProvider implements AiProvider {
+  @override
+  String get id => 'undeclared';
+
+  // Deliberately omits isLocal, exactly as a careless implementer would.
+  @override
+  AiCapabilities get capabilities => const AiCapabilities();
+
+  @override
+  bool get isReady => true;
+
+  @override
+  Future<AiResult> extract(Schema schema, String content, {String? prompt}) async =>
+      throw StateError('must never be reached with egress disabled');
+
+  @override
+  Future<String> complete(String prompt) async =>
+      throw StateError('must never be reached with egress disabled');
+
+  @override
+  Stream<String> stream(String prompt) =>
+      throw StateError('must never be reached with egress disabled');
+
+  @override
+  Future<void> dispose() async {}
+}
+
+void _egressTests() {
+  group('egress gating fails safe', () {
+    test('a provider that does not declare isLocal is treated as remote', () {
+      expect(
+        const AiCapabilities().isLocal,
+        isFalse,
+        reason: 'defaulting to local would exempt it from the egress block',
+      );
+    });
+
+    test('an undeclared provider is skipped when egress is disabled', () async {
+      final chain = ProviderChain(
+        providers: [_UndeclaredProvider()],
+        allowCloudEgress: false,
+      );
+
+      // The provider throws if it is ever invoked, so reaching it fails loudly.
+      await expectLater(
+        chain.extract(Schema.object({'x': const Field.string()}), '<html></html>'),
+        throwsA(isA<Exception>()),
+      );
     });
   });
 }

@@ -7,10 +7,7 @@ import '../structured/mapper.dart';
 /// Interactive multi-view result inspector with field-level provenance badges.
 class ResultViewer extends StatelessWidget {
   /// Creates a [ResultViewer].
-  const ResultViewer({
-    super.key,
-    required this.result,
-  });
+  const ResultViewer({super.key, required this.result});
 
   /// The structured harvest result to render.
   final StructuredHarvestResult result;
@@ -34,7 +31,10 @@ class ResultViewer extends StatelessWidget {
                   tabs: const [
                     Tab(icon: Icon(Icons.table_chart_outlined), text: 'Table'),
                     Tab(icon: Icon(Icons.data_object), text: 'JSON'),
-                    Tab(icon: Icon(Icons.description_outlined), text: 'Markdown'),
+                    Tab(
+                      icon: Icon(Icons.description_outlined),
+                      text: 'Markdown',
+                    ),
                     Tab(icon: Icon(Icons.code), text: 'Raw'),
                   ],
                 ),
@@ -44,7 +44,9 @@ class ResultViewer extends StatelessWidget {
                 tooltip: 'Copy JSON',
                 onPressed: () {
                   Clipboard.setData(
-                    ClipboardData(text: result.toJsonString(includeProvenance: true)),
+                    ClipboardData(
+                      text: result.toJsonString(includeProvenance: true),
+                    ),
                   );
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('JSON copied to clipboard')),
@@ -58,7 +60,10 @@ class ResultViewer extends StatelessWidget {
             child: TabBarView(
               children: [
                 _buildTableView(context),
-                _buildCodeView(result.toJsonString(includeProvenance: true), colorScheme),
+                _buildCodeView(
+                  result.toJsonString(includeProvenance: true),
+                  colorScheme,
+                ),
                 _buildCodeView(result.toMarkdownTable(), colorScheme),
                 _buildCodeView(result.toPrettyString(), colorScheme),
               ],

@@ -8,6 +8,8 @@ On-device AI web scraping for Flutter. Parses real HTML with an HTML5 DOM parser
 
 Web scraping on mobile must balance accuracy, battery life, token expenditure, and user privacy. `flutter_ai_scrapper` uses a four-tier pipeline that prioritizes deterministic execution and only invokes language models when necessary:
 
+https://pub.dev/packages/flutter_ai_scrapper
+
 ```
 [Web Page]
     │

@@ -87,7 +87,9 @@ class _StreamingTextViewState extends State<StreamingTextView> {
             Container(
               margin: const EdgeInsets.only(bottom: 12.0),
               decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                color: colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.5,
+                ),
                 borderRadius: BorderRadius.circular(12.0),
                 border: Border.all(color: colorScheme.outlineVariant),
               ),
@@ -95,13 +97,22 @@ class _StreamingTextViewState extends State<StreamingTextView> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   InkWell(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(12.0)),
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(12.0),
+                    ),
                     onTap: () => setState(() => _showThinking = !_showThinking),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12.0,
+                        vertical: 8.0,
+                      ),
                       child: Row(
                         children: [
-                          Icon(Icons.psychology, size: 18, color: colorScheme.secondary),
+                          Icon(
+                            Icons.psychology,
+                            size: 18,
+                            color: colorScheme.secondary,
+                          ),
                           const SizedBox(width: 8.0),
                           Text(
                             'Model Reasoning (${_isThinking ? "Thinking..." : "Finished"})',
@@ -112,7 +123,9 @@ class _StreamingTextViewState extends State<StreamingTextView> {
                           ),
                           const Spacer(),
                           Icon(
-                            _showThinking ? Icons.expand_less : Icons.expand_more,
+                            _showThinking
+                                ? Icons.expand_less
+                                : Icons.expand_more,
                             size: 18,
                           ),
                         ],
@@ -134,7 +147,9 @@ class _StreamingTextViewState extends State<StreamingTextView> {
               ),
             ),
           SelectableText(
-            _contentBuffer.isEmpty ? 'Waiting for tokens...' : _contentBuffer.toString(),
+            _contentBuffer.isEmpty
+                ? 'Waiting for tokens...'
+                : _contentBuffer.toString(),
             style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
           ),
         ],

@@ -37,7 +37,7 @@ class AiCapabilities {
     this.supportsStreaming = true,
     this.supportsVision = false,
     this.supportsThinking = false,
-    this.isLocal = true,
+    this.isLocal = false,
     this.costPerMTokIn,
     this.costPerMTokOut,
   });
@@ -63,7 +63,14 @@ class AiCapabilities {
   /// Whether the model surfaces reasoning / thinking traces.
   final bool supportsThinking;
 
-  /// Whether inference runs locally on-device without network calls.
+  /// Whether using this provider keeps data on the device.
+  ///
+  /// **Defaults to `false`, and deliberately so.** `ProviderChain` uses this
+  /// flag to enforce `allowCloudEgress`: a provider reporting `true` is exempt
+  /// from that block. Defaulting to `true` would mean a provider whose author
+  /// simply forgot to set it silently bypasses the user's privacy choice and
+  /// ships their scraped content off-device. A security control has to fail
+  /// safe, so anything that has not declared itself local is treated as remote.
   final bool isLocal;
 
   /// Cost in USD per million input tokens (null for local/free models).

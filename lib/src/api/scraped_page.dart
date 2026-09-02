@@ -41,6 +41,16 @@ class ScrapedPage {
   /// Response headers.
   final Map<String, String> headers;
 
+  /// The page title, from OpenGraph, `<title>` or the first `<h1>`.
+  ///
+  /// A Tier-1 convenience: the single most-requested field should not require
+  /// reaching into [document] or unpacking [metadata].
+  String? get title => SmartExtractor.extractTitle(document);
+
+  /// The page summary, from OpenGraph, the description meta tag, or the first
+  /// substantial paragraph.
+  String? get description => SmartExtractor.extractDescription(document);
+
   /// The main article body, extracted using the Readability scoring engine.
   Article article() => ReadabilityScorer.extractArticle(document);
 

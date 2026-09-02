@@ -127,7 +127,9 @@ class _ExtractionConsoleState extends State<ExtractionConsole> {
             decoration: InputDecoration(
               labelText: 'Target URL',
               prefixIcon: const Icon(Icons.link),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12.0),
+              ),
               suffixIcon: IconButton(
                 icon: const Icon(Icons.clear),
                 onPressed: () => _urlController.clear(),
@@ -140,14 +142,26 @@ class _ExtractionConsoleState extends State<ExtractionConsole> {
             decoration: InputDecoration(
               labelText: 'Natural Language Query / Intent',
               prefixIcon: const Icon(Icons.psychology),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.0)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12.0),
+              ),
             ),
           ),
           const SizedBox(height: 12.0),
-          Row(
+          // Wrap, not Row: the button, status chip and token counter together
+          // exceed a narrow screen once the chip label grows from "Idle" to
+          // "Complete", and a Row overflowed by 21px on a 360dp device. Wrap
+          // reflows the counter onto a second line instead, which keeps the
+          // figure fully readable — truncating a cost with an ellipsis would
+          // be worse than moving it.
+          Wrap(
+            spacing: 12.0,
+            runSpacing: 8.0,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               FilledButton.icon(
-                icon: _stage == PipelineStage.fetching ||
+                icon:
+                    _stage == PipelineStage.fetching ||
                         _stage == PipelineStage.recipeRunner ||
                         _stage == PipelineStage.aiInference
                     ? const SizedBox(
@@ -160,11 +174,11 @@ class _ExtractionConsoleState extends State<ExtractionConsole> {
                       )
                     : const Icon(Icons.play_arrow),
                 label: const Text('Extract'),
-                onPressed: _stage == PipelineStage.fetching ? null : _executeScrape,
+                onPressed: _stage == PipelineStage.fetching
+                    ? null
+                    : _executeScrape,
               ),
-              const SizedBox(width: 12.0),
               _buildPipelineStatusChip(colorScheme),
-              const Spacer(),
               Text(
                 'Tokens: ${_session.totalTokens} | \$${_session.estimatedTotalCost.toStringAsFixed(4)}',
                 style: theme.textTheme.bodySmall?.copyWith(

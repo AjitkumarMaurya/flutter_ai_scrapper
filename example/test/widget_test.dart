@@ -4,33 +4,36 @@ import 'package:flutter_test/flutter_test.dart';
 
 /// Smoke test for the demo app.
 ///
-/// Replaces the counter test `flutter create` generates, which tested a
-/// widget this app does not contain.
+/// Replaces the counter test `flutter create` generates, which tested a widget
+/// this app does not contain.
 void main() {
-  testWidgets('the demo app starts and shows its scraping controls',
-      (tester) async {
-    await tester.pumpWidget(const MyApp());
+  testWidgets('the demo app starts on the quick-scrape tier', (tester) async {
+    await tester.pumpWidget(const ScrapperDemoApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('Tag-based Scraping'), findsOneWidget);
-    expect(find.text('Regex-based Scraping'), findsOneWidget);
-    expect(find.text('No scraping performed yet'), findsOneWidget);
+    expect(find.text('Flutter AI Scrapper 2.0'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('the URL field is prefilled with a working example',
-      (tester) async {
-    await tester.pumpWidget(const MyApp());
+  testWidgets('all four API tiers are reachable', (tester) async {
+    await tester.pumpWidget(const ScrapperDemoApp());
     await tester.pumpAndSettle();
 
-    final urlField = tester.widget<TextField>(
-      find.byWidgetPredicate(
-        (w) =>
-            w is TextField &&
-            (w.decoration?.labelText ?? '').toLowerCase().contains('url'),
-      ),
-    );
+    final navBar = find.byType(NavigationBar);
+    expect(navBar, findsOneWidget);
 
-    expect(urlField.controller?.text, startsWith('https://'));
+    final destinations =
+        tester.widget<NavigationBar>(navBar).destinations.length;
+    expect(destinations, 4, reason: 'one destination per API tier');
+  });
+
+  testWidgets('the model manager and provider settings are reachable',
+      (tester) async {
+    await tester.pumpWidget(const ScrapperDemoApp());
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('On-Device Models'), findsOneWidget);
+    expect(find.byTooltip('Provider Settings'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }
