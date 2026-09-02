@@ -5,6 +5,42 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-dev.3] - 2026-09-02
+
+Phase 2: deterministic reduction and structured data harvesting. Shrinks pages
+deterministically and satisfies many schemas with zero inference.
+
+### Added
+
+- **Schema DSL (`Field`, `Schema`)** with validation, automatic type coercion, and
+  Draft-07 JSON Schema generation (`Schema.toJsonSchema()`).
+- **Structured data harvesters:**
+  - `JsonLdHarvester`: parses `<script type="application/ld+json">`, handles `@graph` and arrays.
+  - `MicrodataHarvester`: W3C HTML Microdata (`itemscope`, `itemtype`, `itemprop`).
+  - `RdfaHarvester`: W3C RDFa Lite (`vocab`, `typeof`, `property`).
+  - `OpenGraphHarvester`: OpenGraph, Twitter Cards, canonical links, standard meta tags.
+  - `StructuredMapper`: maps Schema.org types onto target schemas with field synonym resolution
+    and provenance reporting (`ExtractionCoverage`).
+- **Readability scoring engine (`ReadabilityScorer`)** with DOM node scoring, link density
+  penalties, chrome filtering, sibling inclusion, and image preservation.
+- **GFM Markdown serializer (`MarkdownWriter`)** with `MarkdownOptions` and real GitHub-Flavoured
+  table rendering with `th` detection and pipe escaping.
+- **Chunking & ranking pipeline:**
+  - `TokenEstimator`: 4 chars/token heuristic.
+  - `Chunker`: structure-preserving chunking that never splits tables, code blocks, or lists mid-structure.
+  - `Bm25Ranker`: BM25 relevance scoring with query synonym expansion.
+  - `TokenBudget`: context window management with reserved generation headroom.
+- **Tier-1 Public API:**
+  - `AiScrapper.open()` and `AiScrapper.fromHtml()` returning `ScrapedPage`.
+  - `ScrapedPage.article()`, `.markdown`, `.plainText`, `.metadata`, `.links`, `.images`, `.tables`, `.extract(schema)`.
+- **Golden fixture corpus grown to 15 fixtures** (added `commerce_rdfa`, `recipe_jsonld`, `event_microdata`,
+  `article_blog_sidebar`, `jobs_jsonld`).
+
+### Fixed
+
+- **Fabricated currency bug:** money parsing detects real symbols and codes (`£` -> `GBP`, `€` -> `EUR`, `$` -> `USD`, `¥` -> `JPY`). `€99` never becomes `$99`.
+- **Phone extraction:** strict format validation requiring real international/national phone shapes; rejects dates, SKUs, and prices.
+
 ## [2.0.0-dev.2] - 2026-09-02
 
 Phase 1: the parsing core is replaced. Every extraction path now runs through

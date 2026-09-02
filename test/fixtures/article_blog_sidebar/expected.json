@@ -1,0 +1,16 @@
+{
+  "category": "article",
+  "title": "Understanding Neural Network Quantization | AI Architecture Journal",
+  "author": "Marcus Vance",
+  "publishDate": "2024-08-14T14:00:00Z",
+  "canonicalUrl": "https://aijournal.example/posts/quantization",
+  "headingCount": 3,
+  "readableMustContain": [
+    "Quantization reduces the precision"
+  ],
+  "readableMustNotContain": [
+    "Sign up for our AI newsletter",
+    "User123"
+  ],
+  "notes": "Article fixture with noisy sidebar and comments to test readability chrome elimination."
+}

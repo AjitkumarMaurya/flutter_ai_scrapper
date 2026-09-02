@@ -1,6 +1,6 @@
-import 'package:html/dom.dart' as dom;
-
 import '../dom/html_document.dart';
+import '../readability/scorer.dart';
+import '../reduce/markdown_writer.dart';
 
 /// Output shapes [ContentFormatter] can produce.
 enum ContentFormat {
@@ -94,80 +94,12 @@ abstract final class ContentFormatter {
   ///
   /// Headings, paragraphs, lists (including nesting), links, images, emphasis,
   /// code, blockquotes, horizontal rules and tables are all preserved.
-  static String toMarkdown(HtmlDocument document) {
-    final body = _sanitizedCopy(document).body;
-    if (body == null) return '';
-
-    final buffer = StringBuffer();
-    _writeMarkdown(body.raw, buffer, document.baseUrl);
-
-    return _tidyMarkdown(buffer.toString());
-  }
-
-  /// Collapses whitespace **without** flattening list indentation.
-  ///
-  /// A blanket `' *\n *' -> '\n'` pass would strip the leading spaces that
-  /// carry nesting in Markdown, turning a nested list into a flat one. So each
-  /// line keeps its indent and is normalised only from the first non-space
-  /// character onwards.
-  static String _tidyMarkdown(String markdown) {
-    final lines = markdown.split('\n').map((line) {
-      final trimmedEnd = line.trimRight();
-      if (trimmedEnd.trim().isEmpty) return '';
-
-      final indent = trimmedEnd.length - trimmedEnd.trimLeft().length;
-      final content = trimmedEnd.trimLeft().replaceAll(RegExp(r'[ \t]+'), ' ');
-      return '${' ' * indent}$content';
-    });
-
-    return lines
-        .join('\n')
-        .replaceAll(RegExp(r'\n{3,}'), '\n\n')
-        .trim();
-  }
+  static String toMarkdown(HtmlDocument document) =>
+      MarkdownWriter.convert(document);
 
   /// The main article body, with navigation, headers and footers removed.
-  ///
-  /// A first pass at readability: page chrome is dropped, then the densest
-  /// content container wins. Full node scoring — link density, paragraph
-  /// weight, negative class patterns — lands in Phase 2.
-  static String toReadableContent(HtmlDocument document) {
-    final clean = _sanitizedCopy(document, removeChrome: true);
-
-    const candidates = [
-      'article',
-      'main',
-      '[role=main]',
-      '.post-content',
-      '.entry-content',
-      '.article-body',
-      '#content',
-    ];
-
-    String? best;
-    var bestLength = 0;
-
-    for (final selector in candidates) {
-      for (final node in clean.select(selector)) {
-        final text = node.blockText;
-        if (text.length > bestLength) {
-          bestLength = text.length;
-          best = text;
-        }
-      }
-    }
-
-    if (best != null && bestLength >= 200) return best;
-
-    final paragraphs = clean
-        .select('p')
-        .map((p) => p.text)
-        .where((t) => t.length > 40)
-        .join('\n\n');
-
-    if (paragraphs.isNotEmpty) return paragraphs;
-    return best ?? (clean.body?.blockText ?? '');
-  }
+  static String toReadableContent(HtmlDocument document) =>
+      ReadabilityScorer.extractArticle(document).text;
 
   /// Every table on the page, as structured rows rather than flattened text.
   static List<ExtractedTable> extractTables(HtmlDocument document) {
@@ -249,144 +181,4 @@ abstract final class ContentFormatter {
   }) =>
       HtmlDocument.parse(document.raw.outerHtml, url: document.url)
           .sanitize(removeChrome: removeChrome);
-
-  // -------------------------------------------------------------------------
-  // Markdown walker
-  // -------------------------------------------------------------------------
-
-  static void _writeMarkdown(
-    dom.Node node,
-    StringBuffer buffer,
-    String? baseUrl, {
-    int listDepth = 0,
-  }) {
-    for (final child in node.nodes) {
-      if (child.nodeType == dom.Node.TEXT_NODE) {
-        buffer.write(child.text ?? '');
-        continue;
-      }
-      if (child is! dom.Element) continue;
-
-      switch (child.localName) {
-        case 'h1' || 'h2' || 'h3' || 'h4' || 'h5' || 'h6':
-          final level = int.tryParse(child.localName!.substring(1)) ?? 1;
-          buffer.write('\n\n${'#' * level} ${_inline(child)}\n\n');
-
-        case 'p':
-          buffer.write('\n\n');
-          _writeMarkdown(child, buffer, baseUrl, listDepth: listDepth);
-          buffer.write('\n\n');
-
-        case 'br':
-          buffer.write('\n');
-
-        case 'hr':
-          buffer.write('\n\n---\n\n');
-
-        case 'strong' || 'b':
-          final text = _inline(child);
-          if (text.isNotEmpty) buffer.write('**$text**');
-
-        case 'em' || 'i':
-          final text = _inline(child);
-          if (text.isNotEmpty) buffer.write('*$text*');
-
-        case 'code':
-          // A <code> inside <pre> is handled by the 'pre' branch.
-          if (child.parent?.localName != 'pre') {
-            buffer.write('`${_inline(child)}`');
-          } else {
-            buffer.write(child.text);
-          }
-
-        case 'pre':
-          buffer.write('\n\n```\n${child.text.trim()}\n```\n\n');
-
-        case 'a':
-          final text = _inline(child);
-          final href = child.attributes['href'];
-          if (href == null || href.isEmpty) {
-            buffer.write(text);
-          } else {
-            final resolved = _resolve(href, baseUrl);
-            buffer.write('[$text]($resolved)');
-          }
-
-        case 'img':
-          final alt = child.attributes['alt'] ?? '';
-          final src = child.attributes['src'];
-          if (src != null && src.isNotEmpty) {
-            buffer.write('![$alt](${_resolve(src, baseUrl)})');
-          }
-
-        case 'ul' || 'ol':
-          buffer.write('\n');
-          final ordered = child.localName == 'ol';
-          var index = 1;
-          for (final item in child.children) {
-            if (item.localName != 'li') continue;
-            final marker = ordered ? '${index++}.' : '-';
-            buffer.write('\n${'  ' * listDepth}$marker ');
-            _writeMarkdown(item, buffer, baseUrl, listDepth: listDepth + 1);
-          }
-          buffer.write('\n');
-
-        case 'li':
-          // Reached only for a stray <li> outside a list.
-          buffer.write('\n${'  ' * listDepth}- ');
-          _writeMarkdown(child, buffer, baseUrl, listDepth: listDepth + 1);
-
-        case 'blockquote':
-          final inner = StringBuffer();
-          _writeMarkdown(child, inner, baseUrl, listDepth: listDepth);
-          final quoted = inner
-              .toString()
-              .trim()
-              .split('\n')
-              .map((line) => '> $line')
-              .join('\n');
-          buffer.write('\n\n$quoted\n\n');
-
-        case 'table':
-          buffer.write('\n\n${_tableToMarkdown(child)}\n\n');
-
-        default:
-          _writeMarkdown(child, buffer, baseUrl, listDepth: listDepth);
-      }
-    }
-  }
-
-  static String _tableToMarkdown(dom.Element table) {
-    final headers = <String>[];
-    final rows = <List<String>>[];
-
-    for (final row in table.querySelectorAll('tr')) {
-      final cells = row.querySelectorAll('th, td');
-      if (cells.isEmpty) continue;
-
-      final values =
-          cells.map((c) => c.text.replaceAll(RegExp(r'\s+'), ' ').trim()).toList();
-
-      if (cells.every((c) => c.localName == 'th') && headers.isEmpty) {
-        headers.addAll(values);
-      } else {
-        rows.add(values);
-      }
-    }
-
-    return ExtractedTable(headers: headers, rows: rows).toMarkdown();
-  }
-
-  /// Inline text of [element], collapsed to a single line.
-  static String _inline(dom.Element element) =>
-      element.text.replaceAll(RegExp(r'\s+'), ' ').trim();
-
-  static String _resolve(String reference, String? baseUrl) {
-    if (baseUrl == null) return reference;
-    try {
-      return Uri.parse(baseUrl).resolve(reference).toString();
-    } on FormatException {
-      return reference;
-    }
-  }
 }

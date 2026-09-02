@@ -21,6 +21,8 @@
 /// utilities.
 library;
 
+export 'src/api/ai_scrapper.dart';
+export 'src/api/scraped_page.dart';
 export 'src/cache/cache_store.dart';
 export 'src/core/cancellation.dart';
 export 'src/core/platform_info.dart';
@@ -38,5 +40,18 @@ export 'src/net/fetcher.dart';
 export 'src/net/rate_limiter.dart';
 export 'src/net/retry_policy.dart';
 export 'src/net/robots_policy.dart';
+export 'src/readability/scorer.dart';
+export 'src/reduce/bm25_ranker.dart';
+export 'src/reduce/budget.dart';
+export 'src/reduce/chunker.dart';
+export 'src/reduce/markdown_writer.dart';
+export 'src/reduce/token_estimator.dart';
+export 'src/schema/field.dart';
+export 'src/schema/schema.dart';
+export 'src/structured/json_ld.dart';
+export 'src/structured/mapper.dart';
+export 'src/structured/microdata.dart';
+export 'src/structured/open_graph.dart';
+export 'src/structured/rdfa.dart';
 export 'src/utils/content_formatter.dart';
 export 'src/utils/smart_extractor.dart';

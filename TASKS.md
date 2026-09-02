@@ -259,78 +259,90 @@ foundation; do not compromise here to reach the AI work sooner.
 
 # Phase 2 — Reduction & structured data
 
+> ✅ **Complete** — 2026-09-02, tag `v2.0.0-dev.3`.
+> **370 tests** (was 302), **0** analyzer issues.
+> Full Schema DSL with Draft-07 JSON Schema emission and type coercion.
+> Spec-compliant JSON-LD, Microdata, RDFa Lite and OpenGraph harvesters with
+> coverage reporting and automatic schema mapping.
+> Readability scoring engine eliminates page chrome and extracts clean articles.
+> GFM MarkdownWriter with table rendering and structural chunking.
+> BM25 ranker with synonym expansion; token budget with output headroom reservation.
+> Tier-1 public API (`AiScrapper.open`, `ScrapedPage`) working with zero AI installed.
+> Fabricated currency bug and loose phone regex fixed.
+> Corpus expanded to 15 offline fixtures.
+
 **Goal:** shrink a 50k-token page to ~1.5k deterministically, and answer many extractions with
 no model at all. **After this phase the library is already better than the fork, with zero AI.**
 
 ### 2.1 Schema DSL
 
-- [ ] Create `lib/src/schema/field.dart`: `Field.string/number/money/date/url/email/phone/bool/enum_`
-- [ ] Create `lib/src/schema/schema.dart`: `Schema.object(...)`, `Schema.list(...)`, nesting support
-- [ ] `Schema.toJsonSchema()` — emits Draft-07, the shape `flutter_gemma`'s `Tool.parameters` wants
-- [ ] `Schema.validate(Map)` → `ValidationResult` with per-field errors
-- [ ] Type coercion: `"12.99"` → `12.99`, `"2024-01-15"` → `DateTime`
-- [ ] Round-trip test: `Schema` → JSON Schema → validate a known-good and known-bad payload
+- [x] Create `lib/src/schema/field.dart`: `Field.string/number/money/date/url/email/phone/bool/enum_`
+- [x] Create `lib/src/schema/schema.dart`: `Schema.object(...)`, `Schema.list(...)`, nesting support
+- [x] `Schema.toJsonSchema()` — emits Draft-07, the shape `flutter_gemma`'s `Tool.parameters` wants
+- [x] `Schema.validate(Map)` → `ValidationResult` with per-field errors
+- [x] Type coercion: `"12.99"` → `12.99`, `"2024-01-15"` → `DateTime`
+- [x] Round-trip test: `Schema` → JSON Schema → validate a known-good and known-bad payload
       <br>**Acceptance:** JSON Schema output validates against a Draft-07 meta-schema.
 
 ### 2.2 Structured data harvesting (the biggest free win)
 
-- [ ] Create `lib/src/structured/json_ld.dart` — parse all `<script type="application/ld+json">`,
+- [x] Create `lib/src/structured/json_ld.dart` — parse all `<script type="application/ld+json">`,
       handle `@graph` and arrays
-- [ ] Create `lib/src/structured/microdata.dart` — `itemscope` / `itemtype` / `itemprop`
-- [ ] Create `lib/src/structured/rdfa.dart` — `vocab` / `typeof` / `property`
-- [ ] Create `lib/src/structured/open_graph.dart` — OG + Twitter cards + `<link rel=canonical>`
-- [ ] Create `lib/src/structured/mapper.dart` — map schema.org types (`Product`, `Article`,
+- [x] Create `lib/src/structured/microdata.dart` — `itemscope` / `itemtype` / `itemprop`
+- [x] Create `lib/src/structured/rdfa.dart` — `vocab` / `typeof` / `property`
+- [x] Create `lib/src/structured/open_graph.dart` — OG + Twitter cards + `<link rel=canonical>`
+- [x] Create `lib/src/structured/mapper.dart` — map schema.org types (`Product`, `Article`,
       `JobPosting`, `Recipe`, `Event`, `BreadcrumbList`) onto a requested `Schema`
-- [ ] Emit a coverage report: which requested fields were satisfied, which are still missing
+- [x] Emit a coverage report: which requested fields were satisfied, which are still missing
       <br>**Acceptance:** on the commerce fixtures, a standard product schema is satisfied **entirely** from structured data — zero inference.
 
 ### 2.3 Readability
 
-- [ ] Create `lib/src/readability/scorer.dart` — DOM node scoring
-- [ ] Score inputs: text length, link density, `<p>` count, comma count, tag-name weight
-- [ ] Negative weights for `comment|sidebar|footer|nav|ad|promo|social|share|related` in class/id
-- [ ] Positive weights for `article|content|post|entry|main|body|story`
-- [ ] Walk up to find the top candidate, then include qualifying siblings
-- [ ] Preserve images and captions inside the selected content
+- [x] Create `lib/src/readability/scorer.dart` — DOM node scoring
+- [x] Score inputs: text length, link density, `<p>` count, comma count, tag-name weight
+- [x] Negative weights for `comment|sidebar|footer|nav|ad|promo|social|share|related` in class/id
+- [x] Positive weights for `article|content|post|entry|main|body|story`
+- [x] Walk up to find the top candidate, then include qualifying siblings
+- [x] Preserve images and captions inside the selected content
       <br>**Acceptance:** on the article fixtures, extracted text is within ±10% of a hand-marked ground truth, with nav and footer gone.
 
 ### 2.4 Markdown serialiser
 
-- [ ] Create `lib/src/reduce/markdown_writer.dart` — DOM → Markdown (never regex → Markdown)
-- [ ] Handle `h1`–`h6`, `p`, `ul`/`ol`/`li` (incl. nesting), `a`, `img`, `strong`/`em`, `code`/`pre`, `blockquote`, `hr`
-- [ ] **Tables → real GFM tables** with `th` detection (the current formatter flattens them to pipe soup)
-- [ ] `MarkdownOptions`: `includeImages`, `includeLinks`, `maxDepth`, `preserveTables`
-- [ ] Measure and assert the reduction ratio vs. the raw HTML
+- [x] Create `lib/src/reduce/markdown_writer.dart` — DOM → Markdown (never regex → Markdown)
+- [x] Handle `h1`–`h6`, `p`, `ul`/`ol`/`li` (incl. nesting), `a`, `img`, `strong`/`em`, `code`/`pre`, `blockquote`, `hr`
+- [x] **Tables → real GFM tables** with `th` detection (the current formatter flattens them to pipe soup)
+- [x] `MarkdownOptions`: `includeImages`, `includeLinks`, `maxDepth`, `preserveTables`
+- [x] Measure and assert the reduction ratio vs. the raw HTML
       <br>**Acceptance:** ≥10× token reduction across the whole corpus, measured and asserted in a test.
 
 ### 2.5 Chunking & ranking
 
-- [ ] Create `lib/src/reduce/token_estimator.dart` (~4 chars/token heuristic; document the error bar)
-- [ ] Create `lib/src/reduce/chunker.dart` — split on heading boundaries with configurable overlap
-- [ ] Create `lib/src/reduce/bm25_ranker.dart` — score chunks against requested field names + synonyms
-- [ ] Create `lib/src/reduce/budget.dart` — select top-K chunks that fit, **reserving output headroom**
-- [ ] Never split a table or list mid-structure
+- [x] Create `lib/src/reduce/token_estimator.dart` (~4 chars/token heuristic; document the error bar)
+- [x] Create `lib/src/reduce/chunker.dart` — split on heading boundaries with configurable overlap
+- [x] Create `lib/src/reduce/bm25_ranker.dart` — score chunks against requested field names + synonyms
+- [x] Create `lib/src/reduce/budget.dart` — select top-K chunks that fit, **reserving output headroom**
+- [x] Never split a table or list mid-structure
       <br>**Acceptance:** for a known query the chunk containing the answer ranks in the top 3 on ≥8/10 fixtures.
 
 ### 2.6 Tier-1 public API
 
-- [ ] `AiScrapper.open(url)` → `ScrapedPage`
-- [ ] `page.article()` → `Article` (title, byline, publishDate, body markdown, images, readingTime)
-- [ ] `page.markdown`, `page.plainText`, `page.metadata`, `page.links`, `page.images`, `page.tables`
-- [ ] `page.extract(schema)` — structured-data path only for now; returns `partial: true` when incomplete
-- [ ] **Fix the fabricated-currency bug:** money parsing must detect the real symbol/code
+- [x] `AiScrapper.open(url)` → `ScrapedPage`
+- [x] `page.article()` → `Article` (title, byline, publishDate, body markdown, images, readingTime)
+- [x] `page.markdown`, `page.plainText`, `page.metadata`, `page.links`, `page.images`, `page.tables`
+- [x] `page.extract(schema)` — structured-data path only for now; returns `partial: true` when incomplete
+- [x] **Fix the fabricated-currency bug:** money parsing must detect the real symbol/code
       (`€99` must never become `$99`)
-- [ ] **Fix the phone regex:** require a real phone shape, or drop the feature until P6's normalisers
+- [x] **Fix the phone regex:** require a real phone shape, or drop the feature until P6's normalisers
       (today it matches dates, SKUs and prices)
       <br>**Acceptance:** Tier-1 works end to end with **no model installed**.
 
 ### ✅ Exit gate — Phase 2
 
-- [ ] Token reduction ≥10× measured across the corpus
-- [ ] Structured-data path alone satisfies a product schema on a majority of commerce fixtures
-- [ ] Corpus grown to 15 fixtures
-- [ ] `flutter analyze` → 0 issues, `flutter test` green
-- [ ] Tag `v2.0.0-dev.3` — **this is a shippable improvement on its own**
+- [x] Token reduction ≥10× measured across the corpus
+- [x] Structured-data path alone satisfies a product schema on a majority of commerce fixtures
+- [x] Corpus grown to 15 fixtures
+- [x] `flutter analyze` → 0 issues, `flutter test` green
+- [x] Tag `v2.0.0-dev.3` — **this is a shippable improvement on its own**
 
 ---
 

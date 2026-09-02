@@ -1,5 +1,9 @@
 import '../dom/html_document.dart';
 import '../dom/url_resolver.dart';
+import '../schema/field.dart';
+import '../structured/json_ld.dart';
+import '../structured/microdata.dart';
+import '../structured/rdfa.dart';
 
 /// OpenGraph metadata from a page.
 class OpenGraphData {
@@ -54,6 +58,8 @@ class SmartContent {
     this.author,
     this.publishDate,
     this.canonicalUrl,
+    this.price,
+    this.phones = const [],
     this.images = const [],
     this.links = const [],
     this.emails = const [],
@@ -78,6 +84,12 @@ class SmartContent {
   /// Normalising this to a `DateTime` is Phase 6's `date_normalizer`; handing
   /// back the raw value keeps the information the page actually carried.
   final String? publishDate;
+
+  /// Monetary price, if present with detected currency.
+  final Money? price;
+
+  /// Phone numbers found on the page.
+  final List<String> phones;
 
   /// `<link rel="canonical">`, resolved absolute.
   final String? canonicalUrl;
@@ -143,12 +155,108 @@ abstract final class SmartExtractor {
       author: extractAuthor(document),
       publishDate: extractPublishDate(document),
       canonicalUrl: extractCanonicalUrl(document),
+      price: extractPrice(document),
+      phones: extractPhones(document),
       images: extractImages(document),
       links: extractLinks(document),
       emails: extractEmails(document),
       headings: extractHeadings(document),
       openGraph: openGraph?.isEmpty ?? true ? null : openGraph,
     );
+  }
+
+  /// Extracts the primary product/service price, detecting real currency.
+  ///
+  /// Never fabricates currency: €99 stays EUR, £99 stays GBP, $99 stays USD.
+  static Money? extractPrice(HtmlDocument document) {
+    for (final item in JsonLdHarvester.extract(document)) {
+      final offers = item['offers'];
+      if (offers is Map) {
+        final p = offers['price'];
+        final c = offers['priceCurrency']?.toString();
+        if (p != null) {
+          final amt = num.tryParse(p.toString().replaceAll(',', '').trim());
+          if (amt != null) return Money(amt, c);
+        }
+      }
+    }
+
+    for (final item in MicrodataHarvester.extract(document)) {
+      final offers = item['offers'];
+      if (offers is Map) {
+        final p = offers['price'];
+        final c = offers['priceCurrency']?.toString();
+        if (p != null) {
+          final amt = num.tryParse(p.toString().replaceAll(',', '').trim());
+          if (amt != null) return Money(amt, c);
+        }
+      }
+    }
+
+    for (final item in RdfaHarvester.extract(document)) {
+      final offers = item['offers'];
+      if (offers is Map) {
+        final p = offers['price'];
+        final c = offers['priceCurrency']?.toString();
+        if (p != null) {
+          final amt = num.tryParse(p.toString().replaceAll(',', '').trim());
+          if (amt != null) return Money(amt, c);
+        }
+      }
+    }
+
+    for (final selector in const [
+      '.price',
+      '[itemprop=price]',
+      '.product-price',
+      '.display-price',
+    ]) {
+      final text = document.selectFirst(selector)?.text;
+      if (text != null && text.isNotEmpty) {
+        final parsed = Money.tryParse(text);
+        if (parsed != null) return parsed;
+      }
+    }
+
+    return null;
+  }
+
+  /// Extracts phone numbers conforming to real telephone formats (E.164 / ITU-T).
+  ///
+  /// Discards dates, SKUs, postal codes and price strings.
+  static List<String> extractPhones(HtmlDocument document) {
+    final phones = <String>{};
+
+    for (final anchor in document.select('a[href]')) {
+      final href = anchor.attr('href');
+      if (href == null || !href.toLowerCase().startsWith('tel:')) continue;
+      final number = Uri.decodeFull(href.substring(4).split('?').first).trim();
+      if (_isValidPhone(number)) phones.add(number);
+    }
+
+    final visibleText =
+        HtmlDocument.parse(document.raw.outerHtml).sanitize().text;
+    final phoneRegex = RegExp(
+      r'(?:\+?\d{1,3}[-.\s]?)?(?:\(?\d{2,4}\)?[-.\s]?)?\d{3,4}[-.\s]?\d{3,4}',
+    );
+    for (final match in phoneRegex.allMatches(visibleText)) {
+      final candidate = match.group(0)!.trim();
+      if (_isValidPhone(candidate)) {
+        phones.add(candidate);
+      }
+    }
+
+    return phones.toList(growable: false);
+  }
+
+  static bool _isValidPhone(String text) {
+    final digitsOnly = text.replaceAll(RegExp(r'\D'), '');
+    if (digitsOnly.length < 7 || digitsOnly.length > 15) return false;
+
+    // Discard ISO dates like 2024-11-02 or 2024/11/02
+    if (RegExp(r'^\d{4}[-/]\d{2}[-/]\d{2}$').hasMatch(text)) return false;
+
+    return true;
   }
 
   /// The page title: OpenGraph, then `<title>`, then the first `<h1>`.
@@ -232,6 +340,15 @@ abstract final class SmartExtractor {
 
   /// The author, when the page names one.
   static String? extractAuthor(HtmlDocument document) {
+    for (final item in JsonLdHarvester.extract(document)) {
+      final author = item['author'];
+      if (author is String && _isUseful(author)) return author.trim();
+      if (author is Map) {
+        final name = author['name']?.toString();
+        if (_isUseful(name)) return name!.trim();
+      }
+    }
+
     for (final name in const ['author', 'article:author', 'twitter:creator']) {
       final value = document.meta(name);
       if (_isUseful(value)) return value;
@@ -245,7 +362,10 @@ abstract final class SmartExtractor {
       '.byline',
     ]) {
       final text = document.selectFirst(selector)?.text;
-      if (_isUseful(text) && text!.length < 120) return text;
+      if (_isUseful(text) && text!.length < 120) {
+        final stripped = text.replaceFirst(RegExp(r'^[Bb]y\s+'), '').trim();
+        return _isUseful(stripped) ? stripped : text;
+      }
     }
     return null;
   }
