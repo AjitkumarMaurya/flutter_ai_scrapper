@@ -1,4 +1,4 @@
-# 🚀 Flutter Scrapper
+# 🚀 Flutter AI Scrapper
 
 A **lightweight, production-ready** HTML scraper designed specifically for Flutter mobile apps (Android/iOS). Extract data from public websites with intelligent content detection, automatic caching, and beautiful formatting - all on-device with zero backend dependencies.
 
@@ -39,10 +39,14 @@ A **lightweight, production-ready** HTML scraper designed specifically for Flutt
 
 | Platform | Support | Notes |
 |----------|---------|-------|
-| ✅ Android | Full Support | API 21+ |
-| ✅ iOS | Full Support | iOS 12+ |
-| ❌ Web | Not Supported | CORS limitations |
-| ❌ Desktop | Not Supported | Mobile-focused |
+| ✅ Android | Full support | **minSdk 24** (Android 7.0), compileSdk 36 |
+| ✅ iOS | Full support | **iOS 15.0+** |
+| ❌ Web | Not supported | A browser cannot fetch third-party pages (CORS) |
+| ❌ Desktop | Not supported | Out of scope for 2.0; both layers would work, so this may be revisited |
+
+> The Android and iOS floors are set by `flutter_gemma` 1.7.0, which powers on-device
+> inference. Earlier releases of this package advertised API 21 and iOS 12 — those were
+> never achievable alongside on-device AI and have been corrected.
 
 ## 🚀 **Quick Start**
 
@@ -50,13 +54,13 @@ A **lightweight, production-ready** HTML scraper designed specifically for Flutt
 
 ```yaml
 dependencies:
-  flutter_scrapper: ^1.1.0
+  flutter_ai_scrapper: ^2.0.0
 ```
 
 ### Basic Usage
 
 ```dart
-import 'package:flutter_scrapper/mobile_scraper.dart';
+import 'package:flutter_ai_scrapper/flutter_ai_scrapper.dart';
 
 final scraper = MobileScraper(url: 'https://example.com');
 await scraper.load();
@@ -297,7 +301,7 @@ final scraper = MobileScraper(
 
 ```dart
 import 'package:flutter/material.dart';
-import 'package:flutter_scrapper/mobile_scraper.dart';
+import 'package:flutter_ai_scrapper/flutter_ai_scrapper.dart';
 
 class WebScrapingPage extends StatefulWidget {
   @override

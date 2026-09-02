@@ -126,8 +126,13 @@ control in place. Nothing here should alter what the library *does*.
 **Goal:** replace regex parsing with a real DOM and fix every confirmed bug. This is the
 foundation; do not compromise here to reach the AI work sooner.
 
-> **Three bugs below were confirmed by execution against the current source.** Each gets a
-> regression test that **fails on the old implementation** before the fix lands. Write the test first.
+> **Bugs 1–4 were confirmed by execution against the current source; BUG-5 surfaced during
+> Phase 0.** Each gets a regression test that **fails on the old implementation** before the fix
+> lands. Write the test first.
+>
+> The 7 inherited test failures in `test/KNOWN_FAILURES.md` are owned by this phase and Phase 2.
+> Three of them are the library being wrong and the test being right — they should go green as a
+> *consequence* of the rewrite, not by being edited.
 
 ### 1.1 Add the parser
 
@@ -153,7 +158,15 @@ foundation; do not compromise here to reach the AI work sooner.
       stops shadowing `dart:async`'s, and catch `async.TimeoutException` explicitly in `_makeRequest`
 - [ ] **BUG-4 fix:** make `RetryConfig.getDelayForAttempt` genuinely exponential
       (`initialDelay * pow(multiplier, attempt)`) **plus jitter**; add a test asserting the curve
-      <br>**Acceptance:** all four tests fail against the pre-fix code and pass after.
+- [ ] **BUG-5 test:** a pattern whose groups are all non-capturing (`(?:…)`) must not fail.
+      Found during Phase 0 — see `test/KNOWN_FAILURES.md` #3
+- [ ] **BUG-5 fix:** `queryWithRegex` calls `match.group(1)` unconditionally, so a group-less
+      pattern throws `RangeError`, which the broad `catch (e)` then relabels as a `ParseException`
+      about failed parsing — pointing the user at entirely the wrong problem. Two changes:
+      default to `group: 0` (the whole match) when the pattern has no capture groups, and raise
+      `InvalidParameterException` naming the index and the actual group count when an out-of-range
+      group is requested
+      <br>**Acceptance:** all five tests fail against the pre-fix code and pass after.
 
 ### 1.3 Rewrite the network layer
 

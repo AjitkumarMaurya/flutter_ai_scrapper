@@ -1,5 +1,5 @@
+import 'package:flutter_ai_scrapper/flutter_ai_scrapper.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_scrapper/utils/smart_extractor.dart';
 
 void main() {
   group('SmartExtractor', () {

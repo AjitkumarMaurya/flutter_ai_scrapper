@@ -1,5 +1,5 @@
+import 'package:flutter_ai_scrapper/flutter_ai_scrapper.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_scrapper/mobile_scraper.dart';
 
 void main() {
   group('H2 Tag Extraction Tests', () {
@@ -180,7 +180,7 @@ void main() {
       print('📄 Markdown length: ${markdown.length} characters');
       print('📝 First 200 characters:');
       print(
-          '"${markdown.length > 200 ? markdown.substring(0, 200) + '...' : markdown}"');
+          '"${markdown.length > 200 ? '${markdown.substring(0, 200)}...' : markdown}"');
 
       // Verify H2 tags are converted to markdown headers
       expect(markdown, contains('## Artist Categories'));

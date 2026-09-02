@@ -1,0 +1,14 @@
+# Test-only analyzer overrides.
+#
+# Tests legitimately print diagnostic output when a fixture fails, and they
+# construct deliberately malformed values to exercise error paths. Relaxing
+# these here keeps the *library's* zero-issue standard meaningful instead of
+# drowning it in test noise.
+
+include: ../analysis_options.yaml
+
+linter:
+  rules:
+    avoid_print: false
+    avoid_dynamic_calls: false
+    prefer_final_locals: false
