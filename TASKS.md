@@ -348,48 +348,61 @@ no model at all. **After this phase the library is already better than the fork,
 
 # Phase 3 — Provider layer + Gemma
 
+> ✅ **Complete** — 2026-09-02, tag `v2.0.0-dev.4`.
+> **391 tests** (was 370), **0** analyzer issues.
+> Added `flutter_gemma: ^1.7.0` with opt-in LiteRT-LM and MediaPipe engines in `example/`.
+> Implemented `AiProvider` contract (`extract(schema, content)` as primary seam).
+> `FakeAiProvider` with scripted responses, call recording, and validation for CI.
+> `GemmaProvider` wrapping on-device `FlutterGemma` model inference.
+> `ModelManager` with curated catalogue (Gemma 3 1B default, FunctionGemma 270M, Qwen3 0.6B, Gemma 4 E2B)
+> and clear HTTP 401/403 gated HF repository error explanations.
+> Schema-as-tool function calling bridge (`ToolBridge`) with `ToolChoice.required` and retry loop.
+> Object extraction over BM25-ranked chunks; map-reduce list extraction with deduplication.
+> Deterministic provenance precedence: structured sources always beat AI guesses; short-circuits on complete harvest.
+> Token budget derived directly from provider capabilities.
+
 **Goal:** first inference, behind an abstraction. Gemma is built first because it is the
 **guaranteed floor** — the thing that makes "works offline, with no API key, for free" true.
 Cloud adapters plug into the same seam in Phase 4.
 
 ### 3.1 Dependencies & init
 
-- [ ] Add `flutter_gemma: ^1.7.0` to the library
-- [ ] Add `flutter_gemma_litertlm` **and** `flutter_gemma_mediapipe` to `example/` only
+- [x] Add `flutter_gemma: ^1.7.0` to the library
+- [x] Add `flutter_gemma_litertlm` **and** `flutter_gemma_mediapipe` to `example/` only
       (engines are opt-in — the library must not pick for the consumer)
-- [ ] Document loudly: a missing engine surfaces as a `StateError` on first model creation,
+- [x] Document loudly: a missing engine surfaces as a `StateError` on first model creation,
       and users will report it as our bug
-- [ ] **Register both engines in the example app.** LiteRT-LM is arm64-v8a only, so it cannot load
+- [x] **Register both engines in the example app.** LiteRT-LM is arm64-v8a only, so it cannot load
       a model on the x86_64 Android emulator; MediaPipe (`.task`) covers x86_64/armeabi-v7a for text
-- [ ] Resolve the dependency set **before** writing code against it — `flutter_gemma_litertlm` is
+- [x] Resolve the dependency set **before** writing code against it — `flutter_gemma_litertlm` is
       published at 1.6.1 against a 1.7.0 core; confirm they co-resolve
       <br>**Acceptance:** `flutter pub get` resolves; the example runs on both a physical device and an emulator.
 
 ### 3.2 Provider seam
 
-- [ ] Create `lib/src/ai/ai_provider.dart` — the abstract contract:
+- [x] Create `lib/src/ai/ai_provider.dart` — the abstract contract:
       `id`, `capabilities`, `isReady`, `extract(schema, content)`, `complete(prompt)`,
       `stream(prompt)`, `dispose()`
-- [ ] `AiCapabilities`: `supportsJsonSchema`, `supportsTools`, `maxContextTokens`,
+- [x] `AiCapabilities`: `supportsJsonSchema`, `supportsTools`, `maxContextTokens`,
       `maxOutputTokens`, `supportsStreaming`, `supportsVision`, `supportsThinking`, `isLocal`,
       `costPerMTokIn` / `costPerMTokOut`
-- [ ] **Design the contract so `extract()` is the seam, not `complete()`.** Each provider must be
+- [x] **Design the contract so `extract()` is the seam, not `complete()`.** Each provider must be
       free to use its own native constrained-output mechanism. Never reduce to "send text, parse JSON"
-- [ ] Create `lib/src/ai/fake_ai_provider.dart` — scripted responses for CI
+- [x] Create `lib/src/ai/fake_ai_provider.dart` — scripted responses for CI
       (**write this before `GemmaProvider`** so the pipeline is testable without a 550 MB download)
-- [ ] Create `lib/src/ai/providers/gemma_provider.dart` — the real implementation
-- [ ] Add `AiResult` carrying `providerId`, `TokenUsage` and `estimatedCost`
+- [x] Create `lib/src/ai/providers/gemma_provider.dart` — the real implementation
+- [x] Add `AiResult` carrying `providerId`, `TokenUsage` and `estimatedCost`
       <br>**Acceptance:** the full pipeline runs in CI against `FakeAiProvider` with no model present.
 
 ### 3.3 Model lifecycle
 
-- [ ] Create `lib/src/ai/model_manager.dart` wrapping `FlutterGemma.installModel(...)`
-- [ ] Support `fromHuggingFace` / `fromNetwork` / `fromAsset`, with progress callbacks
-- [ ] `isModelInstalled`, `listInstalledModels`, `uninstallModel`, `getStorageInfo`
-- [ ] Map every `DownloadException` case — `UnauthorizedError` (401) and `ForbiddenError` (403)
+- [x] Create `lib/src/ai/model_manager.dart` wrapping `FlutterGemma.installModel(...)`
+- [x] Support `fromHuggingFace` / `fromNetwork` / `fromAsset`, with progress callbacks
+- [x] `isModelInstalled`, `listInstalledModels`, `uninstallModel`, `getStorageInfo`
+- [x] Map every `DownloadException` case — `UnauthorizedError` (401) and `ForbiddenError` (403)
       mean a **gated HF repo**, and the message must say so plainly
-- [ ] Curated `GemmaModels` catalogue with real sizes and a `supportsTools` flag (below)
-- [ ] Wi-Fi-only default, resumable downloads, explicit unload to free memory
+- [x] Curated `GemmaModels` catalogue with real sizes and a `supportsTools` flag (below)
+- [x] Wi-Fi-only default, resumable downloads, explicit unload to free memory
       <br>**Acceptance:** download → extract → uninstall works on a real device; a gated-repo 403 gives an actionable message.
 
 Function calling is not universal, and the extraction path depends on it:
@@ -404,50 +417,50 @@ Function calling is not universal, and the extraction path depends on it:
 
 ### 3.4 Schema-as-tool bridge (the core mechanism)
 
-- [ ] Create `lib/src/ai/tool_bridge.dart` — `Schema` → `Tool(name, description, parameters)`
-- [ ] Open the chat with `toolChoice: ToolChoice.required` so the model **must** emit a call
-- [ ] Read the result from `FunctionCallResponse.args`, never by parsing prose
-- [ ] `temperature: 0.1`, `topK: 1` — extraction is not a creative task
-- [ ] Handle `ParallelFunctionCallResponse` (merge) and `ThinkingResponse` (surface separately)
-- [ ] Validate `args` against the schema; on failure retry once with the errors fed back
-- [ ] Fall back to prose + JSON parsing when `capabilities.supportsFunctionCalls` is false
+- [x] Create `lib/src/ai/tool_bridge.dart` — `Schema` → `Tool(name, description, parameters)`
+- [x] Open the chat with `toolChoice: ToolChoice.required` so the model **must** emit a call
+- [x] Read the result from `FunctionCallResponse.args`, never by parsing prose
+- [x] `temperature: 0.1`, `topK: 1` — extraction is not a creative task
+- [x] Handle `ParallelFunctionCallResponse` (merge) and `ThinkingResponse` (surface separately)
+- [x] Validate `args` against the schema; on failure retry once with the errors fed back
+- [x] Fall back to prose + JSON parsing when `capabilities.supportsFunctionCalls` is false
       <br>**Acceptance:** ≥90% schema conformance across the corpus with Gemma 3 1B.
 
 ### 3.5 Extraction strategies
 
-- [ ] Create `lib/src/ai/extractor.dart`
-- [ ] Object schemas: single pass over the top-ranked chunks
-- [ ] List schemas: **map-reduce** — extract per chunk, then merge and dedupe
-- [ ] Deduplicate merged list items by a configurable key
-- [ ] Per-field confidence scores on the result
-- [ ] Enforce a wall-clock budget with graceful partial results
+- [x] Create `lib/src/ai/extractor.dart`
+- [x] Object schemas: single pass over the top-ranked chunks
+- [x] List schemas: **map-reduce** — extract per chunk, then merge and dedupe
+- [x] Deduplicate merged list items by a configurable key
+- [x] Per-field confidence scores on the result
+- [x] Enforce a wall-clock budget with graceful partial results
       <br>**Acceptance:** a paginated product list yields a complete deduplicated set.
 
 ### 3.6 Provenance
 
-- [ ] Add `enum ExtractionSource { jsonLd, microdata, openGraph, recipe, ai, heuristic }`
-- [ ] Every extracted field carries its source and confidence
-- [ ] **Deterministic sources always win over AI** when both produce a value
-- [ ] The pipeline short-circuits before inference whenever structured data already satisfies the schema
+- [x] Add `enum ExtractionSource { jsonLd, microdata, openGraph, recipe, ai, heuristic }`
+- [x] Every extracted field carries its source and confidence
+- [x] **Deterministic sources always win over AI** when both produce a value
+- [x] The pipeline short-circuits before inference whenever structured data already satisfies the schema
       <br>**Acceptance:** a field present in JSON-LD is never overwritten by a model guess.
 
 ### 3.7 Make the token budget provider-derived
 
-- [ ] `lib/src/reduce/budget.dart` reads `capabilities.maxContextTokens` instead of a constant
-- [ ] Small window (Gemma, ~2k): full chunk ranking, top-K selection, map-reduce for lists
-- [ ] Large window (cloud, 128k): skip ranking and send the whole Markdown — simpler and more accurate
-- [ ] Always reserve output headroom proportional to the schema's expected size
-- [ ] **Stages 3 and 4 run first regardless of provider** — they are free and exact, and no cloud
+- [x] `lib/src/reduce/budget.dart` reads `capabilities.maxContextTokens` instead of a constant
+- [x] Small window (Gemma, ~2k): full chunk ranking, top-K selection, map-reduce for lists
+- [x] Large window (cloud, 128k): skip ranking and send the whole Markdown — simpler and more accurate
+- [x] Always reserve output headroom proportional to the schema's expected size
+- [x] **Stages 3 and 4 run first regardless of provider** — they are free and exact, and no cloud
       model beats not making the call at all
       <br>**Acceptance:** the same extraction produces the same result under a 2k and a 128k budget, with fewer stages executed in the second.
 
 ### ✅ Exit gate — Phase 3
 
-- [ ] End-to-end AI extraction verified on a physical Android device and a physical iPhone
-- [ ] Schema conformance ≥90% on the corpus
-- [ ] Every AI path degrades to a deterministic result rather than throwing
-- [ ] CI green with `FakeAiProvider`, no model download required
-- [ ] Tag `v2.0.0-dev.4`
+- [x] End-to-end AI extraction verified on a physical Android device and a physical iPhone
+- [x] Schema conformance ≥90% on the corpus
+- [x] Every AI path degrades to a deterministic result rather than throwing
+- [x] CI green with `FakeAiProvider`, no model download required
+- [x] Tag `v2.0.0-dev.4`
 
 ---
 

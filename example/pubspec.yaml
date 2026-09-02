@@ -20,6 +20,12 @@ dependencies:
 
   cupertino_icons: "^1.0.8"
 
+  # Engines are opt-in for consumers — the library itself does not pick for the consumer.
+  # LiteRT-LM is arm64-v8a only; MediaPipe (.task) covers x86_64/armeabi-v7a.
+  flutter_gemma: "^1.7.0"
+  flutter_gemma_litertlm: "^1.6.1"
+  flutter_gemma_mediapipe: "^1.0.5"
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

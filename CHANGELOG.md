@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0-dev.4] - 2026-09-02
+
+Phase 3: AI Provider layer and on-device Gemma integration.
+
+### Added
+
+- **`flutter_gemma` integration:** added `flutter_gemma: ^1.7.0` to library dependencies,
+  with opt-in inference engines (`flutter_gemma_litertlm` and `flutter_gemma_mediapipe`) in the demo app.
+- **`AiProvider` contract (`lib/src/ai/ai_provider.dart`):**
+  - Defines `extract(Schema, content)` as the primary seam rather than simple string completions.
+  - Full capability profiling with `AiCapabilities`, execution metrics with `TokenUsage`, and typed `AiResult`.
+- **`FakeAiProvider` (`lib/src/ai/fake_ai_provider.dart`):**
+  - Scripted, deterministic mock provider for CI and offline unit testing without requiring a 550 MB model download.
+- **`GemmaProvider` (`lib/src/ai/providers/gemma_provider.dart`):**
+  - Real on-device provider utilizing `flutter_gemma` with native function calling.
+- **`ModelManager` & `GemmaModels` catalogue (`lib/src/ai/model_manager.dart`):**
+  - Model lifecycle management (`install`, `uninstallModel`, `isModelInstalled`, `listInstalledModels`, `getStorageInfo`).
+  - Curated catalogue: Gemma 3 1B, FunctionGemma 270M, Qwen3 0.6B, Gemma 4 E2B (excluding Gemma 3 270M).
+  - Gated repository error mapping: maps 401 and 403 HTTP errors to clear Hugging Face token and access agreement instructions.
+- **Schema-as-tool bridge (`lib/src/ai/tool_bridge.dart`):**
+  - Translates `Schema` DSL to `Tool` specifications with Draft-07 JSON Schema parameters.
+  - Sets `ToolChoice.required` and parses structured arguments from `FunctionCallResponse.args`.
+  - Self-healing retry feedback loop when validation fails.
+- **Extraction strategies & provenance (`lib/src/ai/extractor.dart`):**
+  - Object extraction over BM25-ranked top-K chunks.
+  - Map-reduce list extraction with chunking and configurable deduplication.
+  - Strict provenance guarantee: deterministic structured data always takes priority over AI guesses.
+  - Short-circuiting: zero inference when structured data already satisfies the schema.
+  - Graceful degradation on timeout.
+- **Provider-derived token budget (`lib/src/reduce/budget.dart`):**
+  - `TokenBudget.fromCapabilities()` and `TokenBudget.fromProvider()`.
+- **Public API:** `ScrapedPage.extractWithAi()` and `ScrapedPage.extractAsync()`.
+
 ## [2.0.0-dev.3] - 2026-09-02
 
 Phase 2: deterministic reduction and structured data harvesting. Shrinks pages

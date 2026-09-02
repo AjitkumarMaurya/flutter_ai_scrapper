@@ -1,6 +1,8 @@
 /// Scraped page representation providing Tier-1 deterministic extraction.
 library;
 
+import '../ai/ai_provider.dart';
+import '../ai/extractor.dart';
 import '../dom/html_document.dart';
 import '../readability/scorer.dart';
 import '../schema/schema.dart';
@@ -60,10 +62,35 @@ class ScrapedPage {
   /// Structured tables on the page.
   List<ExtractedTable> get tables => ContentFormatter.extractTables(document);
 
-  /// Extracts data conforming to [schema] via the deterministic structured-data path.
+  /// Extracts data conforming to [schema] synchronously via the Tier-1
+  /// deterministic structured-data path.
   ///
   /// Short-circuits with zero inference when structured data satisfies the schema.
   /// If fields are missing, returns [StructuredHarvestResult] with `isPartial: true`.
   StructuredHarvestResult extract(Schema schema) =>
       StructuredMapper.mapToSchema(document, schema);
+
+  /// Extracts data conforming to [schema] using an AI [provider] for any fields
+  /// not satisfied by deterministic structured data.
+  ///
+  /// Deterministic structured data always takes precedence over model guesses.
+  Future<StructuredHarvestResult> extractWithAi(
+    Schema schema, {
+    required AiProvider provider,
+    ExtractionOptions options = const ExtractionOptions(),
+  }) =>
+      Extractor(provider).extract(document, schema, options: options);
+
+  /// Asynchronous extraction: uses structured data first, falling back to [provider]
+  /// if provided and fields are missing.
+  Future<StructuredHarvestResult> extractAsync(
+    Schema schema, {
+    AiProvider? provider,
+    ExtractionOptions options = const ExtractionOptions(),
+  }) async {
+    if (provider == null) {
+      return extract(schema);
+    }
+    return extractWithAi(schema, provider: provider, options: options);
+  }
 }

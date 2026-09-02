@@ -25,6 +25,16 @@ enum ExtractionSource {
 
   /// Standard HTML meta tags or fallback heuristics.
   heuristic,
+
+  /// Host-specific cached selector recipe.
+  recipe,
+
+  /// Language model inference (Gemma or cloud).
+  ai;
+
+  /// Whether this source is deterministic (structured markup or rule-based)
+  /// as opposed to probabilistic AI inference.
+  bool get isDeterministic => this != ExtractionSource.ai;
 }
 
 /// Report on which requested schema fields were satisfied from structured data.
@@ -92,10 +102,13 @@ abstract final class StructuredMapper {
     Schema schema,
   ) {
     if (schema is! ObjectSchema) {
-      final val = schema.validate(<String, dynamic>{});
+      final val = schema.validate(<dynamic>[]);
       return StructuredHarvestResult(
         data: {},
-        coverage: const ExtractionCoverage(satisfiedFields: {}, missingFields: []),
+        coverage: const ExtractionCoverage(
+          satisfiedFields: {},
+          missingFields: ['items'],
+        ),
         validation: val,
       );
     }

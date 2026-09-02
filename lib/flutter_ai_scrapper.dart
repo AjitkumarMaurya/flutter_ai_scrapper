@@ -21,6 +21,12 @@
 /// utilities.
 library;
 
+export 'src/ai/ai_provider.dart';
+export 'src/ai/extractor.dart';
+export 'src/ai/fake_ai_provider.dart';
+export 'src/ai/model_manager.dart';
+export 'src/ai/providers/gemma_provider.dart';
+export 'src/ai/tool_bridge.dart';
 export 'src/api/ai_scrapper.dart';
 export 'src/api/scraped_page.dart';
 export 'src/cache/cache_store.dart';

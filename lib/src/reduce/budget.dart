@@ -3,6 +3,7 @@ library;
 
 import 'dart:math' as math;
 
+import '../ai/ai_provider.dart';
 import 'bm25_ranker.dart';
 import 'chunker.dart';
 
@@ -13,6 +14,17 @@ class TokenBudget {
     this.maxContextTokens = 2048,
     this.reservedOutputTokens = 512,
   });
+
+  /// Derives budget constraints directly from [capabilities].
+  factory TokenBudget.fromCapabilities(AiCapabilities capabilities) =>
+      TokenBudget(
+        maxContextTokens: capabilities.maxContextTokens,
+        reservedOutputTokens: capabilities.maxOutputTokens,
+      );
+
+  /// Derives budget constraints directly from an [AiProvider].
+  factory TokenBudget.fromProvider(AiProvider provider) =>
+      TokenBudget.fromCapabilities(provider.capabilities);
 
   /// The total context window limit of the model.
   final int maxContextTokens;

@@ -3,7 +3,7 @@ description: >-
   On-device AI web scraping for Flutter. Parses real HTML with a DOM, harvests
   JSON-LD and OpenGraph for free, and falls back to a local Gemma model or any
   OpenAI/Claude-compatible provider for schema-typed extraction.
-version: 2.0.0-dev.3
+version: 2.0.0-dev.4
 
 repository: https://github.com/raghav117/flutter_scrapper
 homepage: https://github.com/raghav117/flutter_scrapper
@@ -33,6 +33,8 @@ dependencies:
   crypto: "^3.0.6"
   flutter:
     sdk: flutter
+  # On-device AI inference with Gemma and other small LLMs
+  flutter_gemma: "^1.7.0"
   # Spec-compliant HTML5 parsing with CSS selectors. This replaces every
   # extraction regex in 1.x — regex cannot parse a nested, malformed,
   # entity-encoded grammar, which is what HTML is.
