@@ -6,16 +6,16 @@ import '../ai/model_manager.dart';
 /// Modal bottom sheet or dialog allowing users to manage on-device LLM models.
 class ModelManagerSheet extends StatefulWidget {
   /// Creates a [ModelManagerSheet].
-  const ModelManagerSheet({
-    super.key,
-    required this.manager,
-  });
+  const ModelManagerSheet({super.key, required this.manager});
 
   /// The underlying [ModelManager] instance.
   final ModelManager manager;
 
   /// Convenience method to show this sheet modally.
-  static Future<void> show(BuildContext context, {required ModelManager manager}) {
+  static Future<void> show(
+    BuildContext context, {
+    required ModelManager manager,
+  }) {
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -122,124 +122,136 @@ class _ModelManagerSheetState extends State<ModelManagerSheet> {
       color: colorScheme.surface,
       borderRadius: const BorderRadius.vertical(top: Radius.circular(24.0)),
       clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.memory, color: colorScheme.primary),
-                const SizedBox(width: 12.0),
-                Expanded(
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.memory, color: colorScheme.primary),
+                  const SizedBox(width: 12.0),
+                  Expanded(
+                    child: Text(
+                      'On-Device Models',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      _showTokenInput ? Icons.vpn_key : Icons.vpn_key_outlined,
+                    ),
+                    tooltip: 'Hugging Face Token',
+                    onPressed: () =>
+                        setState(() => _showTokenInput = !_showTokenInput),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8.0),
+              if (_storageInfo != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4.0),
                   child: Text(
-                    'On-Device Models',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
+                    'Models footprint: ${_storageInfo!.totalSizeMB.toStringAsFixed(1)} MB (${_storageInfo!.totalFiles} files)',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ),
-                IconButton(
-                  icon: Icon(_showTokenInput ? Icons.vpn_key : Icons.vpn_key_outlined),
-                  tooltip: 'Hugging Face Token',
-                  onPressed: () => setState(() => _showTokenInput = !_showTokenInput),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                title: const Text('Download on Wi-Fi only'),
+                value: _wifiOnly,
+                onChanged: (val) => setState(() => _wifiOnly = val),
+              ),
+              if (_showTokenInput)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8.0),
+                  child: TextField(
+                    controller: _hfTokenController,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      labelText: 'HF Access Token (optional)',
+                      hintText: 'hf_...',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.of(context).pop(),
+              if (_errorMessage != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(12.0),
+                  margin: const EdgeInsets.symmetric(vertical: 8.0),
+                  decoration: BoxDecoration(
+                    color: colorScheme.errorContainer,
+                    borderRadius: BorderRadius.circular(12.0),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.error_outline, color: colorScheme.error),
+                      const SizedBox(width: 8.0),
+                      Expanded(
+                        child: SelectableText(
+                          _errorMessage!,
+                          style: TextStyle(
+                            color: colorScheme.onErrorContainer,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
-            ),
-            const SizedBox(height: 8.0),
-            if (_storageInfo != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4.0),
-                child: Text(
-                  'Models footprint: ${_storageInfo!.totalSizeMB.toStringAsFixed(1)} MB (${_storageInfo!.totalFiles} files)',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              dense: true,
-              title: const Text('Download on Wi-Fi only'),
-              value: _wifiOnly,
-              onChanged: (val) => setState(() => _wifiOnly = val),
-            ),
-            if (_showTokenInput)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8.0),
-                child: TextField(
-                  controller: _hfTokenController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    isDense: true,
-                    labelText: 'Hugging Face Access Token (Optional)',
-                    hintText: 'hf_...',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-              ),
-            if (_errorMessage != null) ...[
-              Container(
-                padding: const EdgeInsets.all(12.0),
-                margin: const EdgeInsets.symmetric(vertical: 8.0),
-                decoration: BoxDecoration(
-                  color: colorScheme.errorContainer,
-                  borderRadius: BorderRadius.circular(12.0),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              const Divider(),
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
                   children: [
-                    Icon(Icons.error_outline, color: colorScheme.error),
-                    const SizedBox(width: 8.0),
-                    Expanded(
-                      child: SelectableText(
-                        _errorMessage!,
-                        style: TextStyle(color: colorScheme.onErrorContainer, fontSize: 13),
-                      ),
+                    _buildModelTile(
+                      GemmaModels.gemma31b,
+                      'Default on-device generalist (~550 MB)',
+                    ),
+                    _buildModelTile(
+                      GemmaModels.functionGemma270m,
+                      'Ultra-light 270M function specialist (~300 MB)',
+                    ),
+                    _buildModelTile(
+                      GemmaModels.qwen306b,
+                      'Multilingual 600M extractor (~400 MB)',
+                    ),
+                    _buildModelTile(
+                      GemmaModels.gemma4E2b,
+                      'High precision 2B edge model (~2.4 GB)',
                     ),
                   ],
                 ),
               ),
             ],
-            const Divider(),
-            Flexible(
-              child: ListView(
-                shrinkWrap: true,
-                children: [
-                  _buildModelTile(
-                    GemmaModels.gemma31b,
-                    'Default on-device generalist (~550 MB)',
-                  ),
-                  _buildModelTile(
-                    GemmaModels.functionGemma270m,
-                    'Ultra-light 270M function specialist (~300 MB)',
-                  ),
-                  _buildModelTile(
-                    GemmaModels.qwen306b,
-                    'Multilingual 600M extractor (~400 MB)',
-                  ),
-                  _buildModelTile(
-                    GemmaModels.gemma4E2b,
-                    'High precision 2B edge model (~2.4 GB)',
-                  ),
-                ],
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildModelTile(GemmaModelSpec model, String subtitle) {
-    final isInstalled = _installedRepos.contains(model.repo) ||
+    final isInstalled =
+        _installedRepos.contains(model.repo) ||
         (model.file != null && _installedRepos.contains(model.file)) ||
-        _installedRepos.any((r) => model.file != null && r.endsWith(model.file!));
+        _installedRepos.any(
+          (r) => model.file != null && r.endsWith(model.file!),
+        );
     final isDownloading = _downloadingRepo == model.repo;
 
     return Card(
@@ -265,6 +277,17 @@ class _ModelManagerSheetState extends State<ModelManagerSheet> {
               visualDensity: VisualDensity.compact,
               label: Text('${model.sizeBytes ~/ (1024 * 1024)} MB'),
             ),
+            // A gated repo answers an anonymous download with 401. Saying so
+            // up front turns "the download is broken" into "I need a token".
+            if (model.gated)
+              Chip(
+                visualDensity: VisualDensity.compact,
+                avatar: const Icon(Icons.key, size: 14),
+                label: const Text('Token'),
+                backgroundColor: Theme.of(
+                  context,
+                ).colorScheme.tertiaryContainer,
+              ),
           ],
         ),
         subtitle: Column(
@@ -295,16 +318,16 @@ class _ModelManagerSheetState extends State<ModelManagerSheet> {
                 onPressed: () => _delete(model),
               )
             : isDownloading
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : ElevatedButton.icon(
-                    icon: const Icon(Icons.download),
-                    label: const Text('Install'),
-                    onPressed: () => _download(model),
-                  ),
+            ? const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : ElevatedButton.icon(
+                icon: const Icon(Icons.download),
+                label: const Text('Install'),
+                onPressed: () => _download(model),
+              ),
       ),
     );
   }

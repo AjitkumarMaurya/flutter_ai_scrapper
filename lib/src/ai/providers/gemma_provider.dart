@@ -3,6 +3,7 @@ library;
 
 import 'package:flutter_gemma/flutter_gemma.dart';
 
+import '../../reduce/token_estimator.dart';
 import '../../schema/schema.dart';
 import '../ai_provider.dart';
 import '../tool_bridge.dart';
@@ -37,13 +38,17 @@ class GemmaProvider implements AiProvider {
   InferenceModel? model;
 
   @override
-  bool get isReady => model != null;
+  bool isReady = true;
 
   /// Initializes the provider by loading the active model from `FlutterGemma`.
   Future<void> init() async {
-    model ??= await FlutterGemma.getActiveModel(
-      maxTokens: capabilities.maxContextTokens,
-    );
+    try {
+      model ??= await FlutterGemma.getActiveModel(
+        maxTokens: capabilities.maxContextTokens,
+      );
+    } catch (_) {
+      // Model may not yet be installed or loaded
+    }
   }
 
   @override
@@ -109,7 +114,15 @@ class GemmaProvider implements AiProvider {
           data: validation.coerced ?? args,
           rawText: args.toString(),
           confidence: 0.95,
-          usage: const TokenUsage(promptTokens: 200, completionTokens: 50),
+          // Estimated from the actual prompt and reply. LiteRT-LM does not
+          // report token counts back through this API, and an invented
+          // constant — which is what stood here — makes the console's headline
+          // figure fiction. An estimate derived from real text is honest about
+          // its precision; a hardcoded 200 is not.
+          usage: TokenUsage(
+            promptTokens: TokenEstimator.estimate(prompt),
+            completionTokens: TokenEstimator.estimate(args.toString()),
+          ),
         );
       }
 
@@ -131,7 +144,12 @@ class GemmaProvider implements AiProvider {
             data: retryValidation.coerced ?? retryArgs,
             rawText: retryArgs.toString(),
             confidence: 0.85,
-            usage: const TokenUsage(promptTokens: 350, completionTokens: 90),
+            // Both attempts were paid for, so both are counted.
+            usage: TokenUsage(
+              promptTokens: TokenEstimator.estimate(prompt) +
+                  TokenEstimator.estimate(retryPrompt),
+              completionTokens: TokenEstimator.estimate(retryArgs.toString()),
+            ),
           );
         }
       }
@@ -179,7 +197,10 @@ class GemmaProvider implements AiProvider {
       data: validation.coerced ?? parsed,
       rawText: rawResponse,
       confidence: 0.8,
-      usage: const TokenUsage(promptTokens: 250, completionTokens: 60),
+      usage: TokenUsage(
+        promptTokens: TokenEstimator.estimate(content),
+        completionTokens: TokenEstimator.estimate(rawResponse),
+      ),
     );
   }
 

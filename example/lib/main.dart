@@ -34,7 +34,11 @@ class _ScrapperDemoAppState extends State<ScrapperDemoApp> {
 
   void _toggleTheme() {
     setState(() {
-      _themeMode = _themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
+      final isDark = _themeMode == ThemeMode.dark ||
+          (_themeMode == ThemeMode.system &&
+              WidgetsBinding.instance.platformDispatcher.platformBrightness ==
+                  Brightness.dark);
+      _themeMode = isDark ? ThemeMode.light : ThemeMode.dark;
     });
   }
 
@@ -95,7 +99,7 @@ class _DemoHomeScreenState extends State<DemoHomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Flutter AI Scrapper 2.0'),
+        title: const Text('AI Scrapper 2.0'),
         actions: [
           IconButton(
             icon: const Icon(Icons.memory),
@@ -230,6 +234,7 @@ class _DemoHomeScreenState extends State<DemoHomeScreen> {
     try {
       final page = await AiScrapper.scrape('https://news.ycombinator.com');
       if (!mounted) return;
+      setState(() => _quickScrapeBusy = false);
 
       await showDialog<void>(
         context: context,

@@ -70,16 +70,13 @@ class _ProviderSettingsSheetState extends State<ProviderSettingsSheet> {
         color: colorScheme.surface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24.0)),
       ),
-      // One scroll surface for the whole sheet. A bottom sheet gets whatever
-      // height the viewport allows, and at 320dp the header, egress card and
-      // provider list wrap onto enough lines to exceed it — this overflowed by
-      // 76px. Scrolling the lot is better than clipping any of it, since the
-      // egress toggle is a security control the user must be able to reach.
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+      child: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
             Row(
               children: [
                 Icon(Icons.tune, color: colorScheme.primary),
@@ -195,6 +192,7 @@ class _ProviderSettingsSheetState extends State<ProviderSettingsSheet> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

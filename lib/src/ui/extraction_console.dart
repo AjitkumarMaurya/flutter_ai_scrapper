@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../ai/ai_provider.dart';
 import '../ai/cost_tracker.dart';
 import '../api/ai_scrapper.dart';
+import '../core/scraper_exceptions.dart';
 import '../recipe/store.dart';
 import '../structured/mapper.dart';
 import 'result_viewer.dart';
@@ -102,6 +103,13 @@ class _ExtractionConsoleState extends State<ExtractionConsole> {
           _result = askResult.harvestResult;
         });
       }
+    } on ScraperException catch (e) {
+      if (mounted) {
+        setState(() {
+          _stage = PipelineStage.error;
+          _errorMessage = e.userMessage;
+        });
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -117,104 +125,154 @@ class _ExtractionConsoleState extends State<ExtractionConsole> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          TextField(
-            controller: _urlController,
-            decoration: InputDecoration(
-              labelText: 'Target URL',
-              prefixIcon: const Icon(Icons.link),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12.0),
-              ),
-              suffixIcon: IconButton(
-                icon: const Icon(Icons.clear),
-                onPressed: () => _urlController.clear(),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12.0),
-          TextField(
-            controller: _queryController,
-            decoration: InputDecoration(
-              labelText: 'Natural Language Query / Intent',
-              prefixIcon: const Icon(Icons.psychology),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12.0),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isConstrained = constraints.maxHeight < 520;
+
+        final formContent = Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _urlController,
+              decoration: InputDecoration(
+                labelText: 'Target URL',
+                prefixIcon: const Icon(Icons.link),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12.0),
+                ),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.clear),
+                  onPressed: () => _urlController.clear(),
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 12.0),
-          // Wrap, not Row: the button, status chip and token counter together
-          // exceed a narrow screen once the chip label grows from "Idle" to
-          // "Complete", and a Row overflowed by 21px on a 360dp device. Wrap
-          // reflows the counter onto a second line instead, which keeps the
-          // figure fully readable — truncating a cost with an ellipsis would
-          // be worse than moving it.
-          Wrap(
-            spacing: 12.0,
-            runSpacing: 8.0,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              FilledButton.icon(
-                icon:
-                    _stage == PipelineStage.fetching ||
-                        _stage == PipelineStage.recipeRunner ||
-                        _stage == PipelineStage.aiInference
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Icon(Icons.play_arrow),
-                label: const Text('Extract'),
-                onPressed: _stage == PipelineStage.fetching
-                    ? null
-                    : _executeScrape,
+            const SizedBox(height: 12.0),
+            TextField(
+              controller: _queryController,
+              decoration: InputDecoration(
+                labelText: 'Natural Language Query / Intent',
+                prefixIcon: const Icon(Icons.psychology),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12.0),
+                ),
               ),
-              _buildPipelineStatusChip(colorScheme),
-              Text(
-                'Tokens: ${_session.totalTokens} | \$${_session.estimatedTotalCost.toStringAsFixed(4)}',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: 12.0),
+            Wrap(
+              spacing: 12.0,
+              runSpacing: 8.0,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                FilledButton.icon(
+                  icon: _stage == PipelineStage.fetching ||
+                          _stage == PipelineStage.recipeRunner ||
+                          _stage == PipelineStage.aiInference
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.play_arrow),
+                  label: const Text('Extract'),
+                  onPressed: _stage == PipelineStage.fetching
+                      ? null
+                      : _executeScrape,
+                ),
+                _buildPipelineStatusChip(colorScheme),
+                Text(
+                  'Tokens: ${_session.totalTokens} | \$${_session.estimatedTotalCost.toStringAsFixed(4)}',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+            if (_errorMessage != null) ...[
+              const SizedBox(height: 12.0),
+              Container(
+                padding: const EdgeInsets.all(12.0),
+                decoration: BoxDecoration(
+                  color: colorScheme.errorContainer,
+                  borderRadius: BorderRadius.circular(12.0),
+                ),
+                child: Text(
+                  _errorMessage!,
+                  style: TextStyle(color: colorScheme.onErrorContainer),
                 ),
               ),
             ],
-          ),
-          if (_errorMessage != null) ...[
-            const SizedBox(height: 12.0),
-            Container(
-              padding: const EdgeInsets.all(12.0),
-              decoration: BoxDecoration(
-                color: colorScheme.errorContainer,
-                borderRadius: BorderRadius.circular(12.0),
-              ),
-              child: Text(
-                _errorMessage!,
-                style: TextStyle(color: colorScheme.onErrorContainer),
-              ),
-            ),
+            const SizedBox(height: 16.0),
+            const Divider(),
           ],
-          const SizedBox(height: 16.0),
-          const Divider(),
-          Expanded(
-            child: _result != null
-                ? ResultViewer(result: _result!)
-                : Center(
-                    child: Text(
-                      'Ready. Enter a URL and tap Extract.',
-                      style: TextStyle(color: colorScheme.onSurfaceVariant),
-                    ),
+        );
+
+        Widget buildResultPane() {
+          if (_result != null) {
+            return ResultViewer(result: _result!);
+          }
+          if (_stage == PipelineStage.error) {
+            return const SizedBox.shrink();
+          }
+          if (_stage == PipelineStage.fetching ||
+              _stage == PipelineStage.recipeRunner ||
+              _stage == PipelineStage.aiInference) {
+            return Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 12),
+                  Text(
+                    _stage == PipelineStage.fetching
+                        ? 'Fetching webpage...'
+                        : _stage == PipelineStage.recipeRunner
+                            ? 'Running selector recipes...'
+                            : 'Performing AI extraction...',
+                    style: TextStyle(color: colorScheme.onSurfaceVariant),
                   ),
+                ],
+              ),
+            );
+          }
+          return Center(
+            child: Text(
+              'Ready. Enter a URL and tap Extract.',
+              style: TextStyle(color: colorScheme.onSurfaceVariant),
+            ),
+          );
+        }
+
+        if (isConstrained) {
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                formContent,
+                SizedBox(
+                  height: 360,
+                  child: buildResultPane(),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              formContent,
+              Expanded(child: buildResultPane()),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 

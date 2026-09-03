@@ -16,6 +16,7 @@ class GemmaModelSpec {
     required this.supportsTools,
     required this.description,
     this.isDefault = false,
+    this.gated = false,
   });
 
   /// Human-readable model name.
@@ -47,6 +48,14 @@ class GemmaModelSpec {
   /// Whether this is the recommended default model.
   final bool isDefault;
 
+  /// Whether the Hugging Face repository is gated.
+  ///
+  /// A gated repo returns HTTP 401 to an anonymous download, so installing it
+  /// needs a user access token passed to `FlutterGemma.initialize`. Verified by
+  /// request against each repository — an unmarked gated model would look like
+  /// a broken download rather than a missing credential.
+  final bool gated;
+
   /// Size in megabytes.
   double get sizeMb => sizeBytes / (1024 * 1024);
 }
@@ -60,10 +69,12 @@ abstract final class GemmaModels {
     file: 'gemma3-1b-it-int4.litertlm',
     modelType: ModelType.gemmaIt,
     fileType: ModelFileType.litertlm,
-    sizeBytes: 550 * 1024 * 1024,
+    sizeBytes: 690 * 1024 * 1024,
     supportsTools: true,
-    description: 'Default on-device extraction model (~550 MB)',
+    description:
+        'Best quality-per-megabyte (~690 MB). Needs a Hugging Face token.',
     isDefault: true,
+    gated: true,
   );
 
   /// FunctionGemma 270M — lightest viable model with native function calling.
@@ -75,7 +86,10 @@ abstract final class GemmaModels {
     fileType: ModelFileType.litertlm,
     sizeBytes: 300 * 1024 * 1024,
     supportsTools: true,
-    description: 'Lightest viable function-calling model (~300 MB, single-turn)',
+    description:
+        'Lightest function-calling model (~300 MB, single-turn). '
+        'Needs a Hugging Face token.',
+    gated: true,
   );
 
   /// Qwen3 0.6B — optimized for low-RAM mobile devices.
@@ -85,9 +99,11 @@ abstract final class GemmaModels {
     file: 'Qwen3-0.6B.litertlm',
     modelType: ModelType.qwen3,
     fileType: ModelFileType.litertlm,
-    sizeBytes: 400 * 1024 * 1024,
+    sizeBytes: 586 * 1024 * 1024,
     supportsTools: true,
-    description: 'Compact model for low-memory devices (~400 MB)',
+    description:
+        'Compact, and the only catalogue model that needs no token '
+        '(~586 MB)',
   );
 
   /// Gemma 4 E2B — quality tier model with native function-calling tokens.
@@ -97,9 +113,9 @@ abstract final class GemmaModels {
     file: 'gemma-4-E2B-it.litertlm',
     modelType: ModelType.gemma4,
     fileType: ModelFileType.litertlm,
-    sizeBytes: 2400 * 1024 * 1024,
+    sizeBytes: 2468 * 1024 * 1024,
     supportsTools: true,
-    description: 'High-quality extraction model (~2.4 GB, Wi-Fi recommended)',
+    description: 'Highest quality (~2.4 GB). Wi-Fi strongly recommended.',
   );
 
   /// Gemma 3 270M — excluded from extraction because it lacks tools support.
@@ -110,7 +126,8 @@ abstract final class GemmaModels {
     fileType: ModelFileType.litertlm,
     sizeBytes: 200 * 1024 * 1024,
     supportsTools: false,
-    description: 'Excluded: lacks function-calling support needed for schema extraction',
+    description:
+        'Excluded: lacks function-calling support needed for schema extraction',
   );
 
   /// All supported extraction models.
@@ -142,14 +159,10 @@ class ModelManager {
 
     try {
       await FlutterGemma.installModel(
-        modelType: spec.modelType,
-        fileType: spec.fileType,
-      )
-          .fromHuggingFace(
-            spec.repo,
-            file: spec.file,
-            token: token,
+            modelType: spec.modelType,
+            fileType: spec.fileType,
           )
+          .fromHuggingFace(spec.repo, file: spec.file, token: token)
           .withProgress((progress) => onProgress?.call(progress / 100.0))
           .install();
     } catch (e) {
@@ -167,15 +180,8 @@ class ModelManager {
     void Function(double progress)? onProgress,
   }) async {
     try {
-      await FlutterGemma.installModel(
-        modelType: modelType,
-        fileType: fileType,
-      )
-          .fromHuggingFace(
-            repo,
-            file: file,
-            token: token,
-          )
+      await FlutterGemma.installModel(modelType: modelType, fileType: fileType)
+          .fromHuggingFace(repo, file: file, token: token)
           .withProgress((progress) => onProgress?.call(progress / 100.0))
           .install();
     } catch (e) {
@@ -192,10 +198,7 @@ class ModelManager {
     void Function(double progress)? onProgress,
   }) async {
     try {
-      await FlutterGemma.installModel(
-        modelType: modelType,
-        fileType: fileType,
-      )
+      await FlutterGemma.installModel(modelType: modelType, fileType: fileType)
           .fromNetwork(url, token: token)
           .withProgress((progress) => onProgress?.call(progress / 100.0))
           .install();
@@ -258,6 +261,38 @@ class ModelManager {
       }
       return downloadError.toUserMessage();
     }
-    return error.toString();
+
+    // Not every failure arrives as a typed DownloadException — a transport
+    // layer or a proxy can surface the same condition as a plain error. Read
+    // the status out of the text rather than handing back a bare toString(),
+    // which tells the user nothing about what to do next.
+    final text = error.toString();
+    if (text.contains('401')) {
+      return 'Gated or private Hugging Face repository (HTTP 401).\n'
+          'Supply a Hugging Face user access token via '
+          'FlutterGemma.initialize(huggingFaceToken: "hf_..."), or choose a '
+          'model that is not marked as needing a token.';
+    }
+    if (text.contains('403')) {
+      return 'Gated Hugging Face repository access forbidden (HTTP 403).\n'
+          'Accept the model licence at https://huggingface.co and check that '
+          'your token has read permission.';
+    }
+    if (text.contains('404')) {
+      return 'Model not found on Hugging Face (HTTP 404). '
+          'Check the repository identifier and file name.';
+    }
+    if (text.contains('429')) {
+      return 'Hugging Face rate limit exceeded (HTTP 429). '
+          'Please wait before trying again.';
+    }
+    if (text.contains('SocketException') || text.contains('Failed host lookup')) {
+      return 'Could not reach Hugging Face. Check your network connection.';
+    }
+    if (text.toLowerCase().contains('no space')) {
+      return 'Not enough free storage for this model. '
+          'Free some space and try again.';
+    }
+    return text;
   }
 }

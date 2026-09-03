@@ -11,7 +11,7 @@ void main() {
     await tester.pumpWidget(const ScrapperDemoApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('Flutter AI Scrapper 2.0'), findsOneWidget);
+    expect(find.text('AI Scrapper 2.0'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

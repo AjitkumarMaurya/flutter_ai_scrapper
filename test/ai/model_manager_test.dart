@@ -8,7 +8,10 @@ void main() {
     test('verifies catalogue specifications and tool-support constraints', () {
       expect(GemmaModels.gemma31b.isDefault, isTrue);
       expect(GemmaModels.gemma31b.supportsTools, isTrue);
-      expect(GemmaModels.gemma31b.sizeMb, closeTo(550, 10));
+      // 690 MB measured by request against the pinned file on 2026-09-03.
+      // The catalogue previously claimed 550 MB; the size is the number a user
+      // weighs before committing to the download, so it has to be the real one.
+      expect(GemmaModels.gemma31b.sizeMb, closeTo(690, 10));
 
       expect(GemmaModels.functionGemma270m.supportsTools, isTrue);
       expect(GemmaModels.functionGemma270m.sizeMb, closeTo(300, 10));
