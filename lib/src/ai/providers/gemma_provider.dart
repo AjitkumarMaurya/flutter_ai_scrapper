@@ -1,6 +1,8 @@
 /// On-device Gemma AI provider implementation.
 library;
 
+import 'dart:developer' as developer;
+
 import 'package:flutter_gemma/flutter_gemma.dart';
 
 import '../../reduce/token_estimator.dart';
@@ -14,6 +16,8 @@ class GemmaProvider implements AiProvider {
   GemmaProvider({
     this.id = 'gemma-on-device',
     this.model,
+    this.preferredBackend,
+    this.modelType,
     this.capabilities = const AiCapabilities(
       supportsJsonSchema: true,
       supportsTools: true,
@@ -37,6 +41,18 @@ class GemmaProvider implements AiProvider {
   /// Underlying loaded model instance, or null before [init].
   InferenceModel? model;
 
+  /// The model architecture / family (e.g. [ModelType.qwen3], [ModelType.gemma4]).
+  ///
+  /// Inferred automatically from [FlutterGemma.activeModelSpec] when not specified.
+  final ModelType? modelType;
+
+  /// Preferred hardware accelerator backend (e.g. CPU, GPU, NPU).
+  ///
+  /// On devices with Mali or PowerVR GPUs, GPU OpenCL compute can lock the graphics
+  /// pipeline and stall Flutter's UI renderer. Specifying [PreferredBackend.cpu]
+  /// keeps inference on background threads without GPU fence timeouts.
+  final PreferredBackend? preferredBackend;
+
   @override
   bool isReady = true;
 
@@ -45,6 +61,7 @@ class GemmaProvider implements AiProvider {
     try {
       model ??= await FlutterGemma.getActiveModel(
         maxTokens: capabilities.maxContextTokens,
+        preferredBackend: preferredBackend,
       );
     } catch (_) {
       // Model may not yet be installed or loaded
@@ -62,7 +79,12 @@ class GemmaProvider implements AiProvider {
       );
     }
 
-    if (capabilities.supportsTools) {
+    final resolvedModelType = modelType ??
+        FlutterGemma.activeModelSpec?.modelType ??
+        ModelType.gemmaIt;
+
+    if (capabilities.supportsTools &&
+        resolvedModelType == ModelType.functionGemma) {
       return _extractWithTools(schema, content, activeModel);
     } else {
       return _extractWithJsonPrompt(schema, content, activeModel);
@@ -84,6 +106,10 @@ class GemmaProvider implements AiProvider {
       maxOutputTokens: capabilities.maxOutputTokens,
     );
 
+    final resolvedModelType = modelType ??
+        FlutterGemma.activeModelSpec?.modelType ??
+        ModelType.gemmaIt;
+
     final chat = InferenceChat(
       sessionCreator: () => activeModel.createSession(
         temperature: 0.1,
@@ -94,7 +120,7 @@ class GemmaProvider implements AiProvider {
       maxTokens: capabilities.maxContextTokens,
       supportsFunctionCalls: true,
       toolChoice: ToolChoice.required,
-      modelType: ModelType.gemmaIt,
+      modelType: resolvedModelType,
       fileType: activeModel.fileType,
     );
     chat.session = session;
@@ -165,15 +191,18 @@ class GemmaProvider implements AiProvider {
     InferenceModel activeModel,
   ) async {
     final prompt = ToolBridge.buildJsonPrompt(schema, content);
+    final maxTokens = capabilities.maxOutputTokens;
     final session = await activeModel.createSession(
       temperature: 0.1,
       topK: 1,
-      maxOutputTokens: capabilities.maxOutputTokens,
+      maxOutputTokens: maxTokens,
     );
 
+    print('AI_SCRAPPER_PROMPT: >>>$prompt<<<');
     await session.addQueryChunk(Message(text: prompt, isUser: true));
     final rawResponse = await session.getResponse();
     await session.close();
+    print('AI_SCRAPPER_RAW_OUTPUT: >>>$rawResponse<<<');
 
     final parsed = ToolBridge.parseJsonFromProse(rawResponse);
     if (parsed == null) {

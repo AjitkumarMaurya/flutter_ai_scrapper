@@ -53,6 +53,7 @@ class _ExtractionConsoleState extends State<ExtractionConsole> {
   StructuredHarvestResult? _result;
   String? _errorMessage;
   final UsageSession _session = UsageSession();
+  String? _aiNotice;
 
   @override
   void initState() {
@@ -80,6 +81,7 @@ class _ExtractionConsoleState extends State<ExtractionConsole> {
     setState(() {
       _stage = PipelineStage.fetching;
       _errorMessage = null;
+      _aiNotice = null;
       _result = null;
     });
 
@@ -98,9 +100,30 @@ class _ExtractionConsoleState extends State<ExtractionConsole> {
       );
 
       if (mounted) {
+        final outcome = askResult.harvestResult.aiOutcome;
+
+        // Record what the run actually cost. Before this the session was
+        // created, displayed, and never written to, so the token counter read
+        // zero no matter what the model did.
+        final usage = outcome?.usage;
+        if (usage != null) {
+          _session.recordUsage(usage);
+        } else if (outcome == null) {
+          // Deterministic data satisfied the schema, so no inference happened.
+          _session.recordShortCircuit();
+        }
+
         setState(() {
           _stage = PipelineStage.complete;
           _result = askResult.harvestResult;
+          // Surface a non-succeeded AI stage. "The model found nothing" and
+          // "the model never finished" are indistinguishable in the data, and
+          // staying silent about the difference makes the pipeline
+          // undebuggable from the outside.
+          _aiNotice = switch (outcome?.status) {
+            AiStatus.timedOut || AiStatus.failed => outcome!.message,
+            _ => null,
+          };
         });
       }
     } on ScraperException catch (e) {
@@ -127,7 +150,10 @@ class _ExtractionConsoleState extends State<ExtractionConsole> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isConstrained = constraints.maxHeight < 520;
+        final hasBanner = _errorMessage != null || _aiNotice != null;
+        final minComfortableHeight = hasBanner ? 780.0 : 640.0;
+        final isConstrained = !constraints.hasBoundedHeight ||
+            constraints.maxHeight < minComfortableHeight;
 
         final formContent = Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -202,6 +228,39 @@ class _ExtractionConsoleState extends State<ExtractionConsole> {
                 child: Text(
                   _errorMessage!,
                   style: TextStyle(color: colorScheme.onErrorContainer),
+                ),
+              ),
+            ],
+            // The run succeeded, but the AI stage did not contribute. Results
+            // are still shown — they are just deterministic-only.
+            if (_aiNotice != null) ...[
+              const SizedBox(height: 12.0),
+              Container(
+                padding: const EdgeInsets.all(12.0),
+                decoration: BoxDecoration(
+                  color: colorScheme.tertiaryContainer,
+                  borderRadius: BorderRadius.circular(12.0),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      size: 18,
+                      color: colorScheme.onTertiaryContainer,
+                    ),
+                    const SizedBox(width: 8.0),
+                    Expanded(
+                      child: Text(
+                        'AI stage skipped — showing deterministic results '
+                        'only.\n${_aiNotice!}',
+                        style: TextStyle(
+                          color: colorScheme.onTertiaryContainer,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],

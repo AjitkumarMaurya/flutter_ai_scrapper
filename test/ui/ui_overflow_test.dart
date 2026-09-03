@@ -24,9 +24,10 @@ Future<void> _pumpAt(
   WidgetTester tester,
   Widget child,
   double width, {
+  double height = 800,
   ThemeMode mode = ThemeMode.light,
 }) async {
-  tester.view.physicalSize = Size(width, 800);
+  tester.view.physicalSize = Size(width, height);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
 
@@ -61,6 +62,18 @@ void main() {
       );
       expect(tester.takeException(), isNull);
     });
+
+    for (final h in [480.0, 540.0, 600.0]) {
+      testWidgets('does not overflow at height ${h.toInt()}dp', (tester) async {
+        await _pumpAt(
+          tester,
+          ExtractionConsole(provider: FakeAiProvider()),
+          360,
+          height: h,
+        );
+        expect(tester.takeException(), isNull);
+      });
+    }
 
     testWidgets('shows the token and cost counter', (tester) async {
       await _pumpAt(
@@ -99,6 +112,13 @@ void main() {
           isNull,
           reason: 'ResultViewer overflowed at ${width}dp',
         );
+      });
+    }
+
+    for (final h in [150.0, 200.0, 300.0]) {
+      testWidgets('does not overflow at height ${h.toInt()}dp', (tester) async {
+        await _pumpAt(tester, ResultViewer(result: result), 360, height: h);
+        expect(tester.takeException(), isNull);
       });
     }
 

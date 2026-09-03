@@ -16,13 +16,41 @@ import 'ai_provider.dart';
 class ExtractionOptions {
   /// Creates extraction options.
   const ExtractionOptions({
-    this.timeout = const Duration(seconds: 30),
+    this.timeout,
     this.listDeduplicationKey,
     this.maxListChunks = 5,
   });
 
-  /// Wall-clock timeout after which partial results are gracefully returned.
-  final Duration timeout;
+  /// Wall-clock budget for the AI stage, or `null` to derive it from the
+  /// provider.
+  ///
+  /// Leave this unset. A single constant cannot serve both paths: measured on a
+  /// mid-range Android phone, a 0.6B model spent **38.6 seconds** on prefill
+  /// alone, so the old fixed 30-second default meant on-device extraction could
+  /// never finish — it timed out on every run and silently returned the
+  /// deterministic result, which looked exactly like "the AI contributed
+  /// nothing". See [budgetFor].
+  final Duration? timeout;
+
+  /// The budget to allow a given provider.
+  ///
+  /// An explicit [timeout] always wins. Otherwise a local model gets
+  /// [localBudget], because it is slow but free and cannot leave the device;
+  /// a network provider gets [remoteBudget], because a request that hangs that
+  /// long is a request worth abandoning.
+  Duration budgetFor(AiProvider provider) =>
+      timeout ??
+      (provider.capabilities.isLocal ? localBudget : remoteBudget);
+
+  /// Default budget for on-device inference.
+  ///
+  /// Generous on purpose: a phone doing a cold model load plus prefill can
+  /// legitimately take a minute or more, and cutting it off wastes the work
+  /// already done.
+  static const Duration localBudget = Duration(minutes: 5);
+
+  /// Default budget for a network provider.
+  static const Duration remoteBudget = Duration(seconds: 45);
 
   /// Property key to use for list item deduplication (e.g. `'id'`, `'sku'`, `'name'`).
   final String? listDeduplicationKey;
@@ -58,6 +86,8 @@ class Extractor {
       return harvestResult;
     }
 
+    final budget = options.budgetFor(provider);
+
     try {
       return await _runAiExtraction(
         document,
@@ -65,12 +95,20 @@ class Extractor {
         harvestResult,
         options,
       ).timeout(
-        options.timeout,
-        onTimeout: () => harvestResult, // Gracefully return partial harvest on timeout
+        budget,
+        onTimeout: () => harvestResult.withAiOutcome(
+          AiOutcome.timedOut(provider.id, budget),
+        ),
       );
-    } catch (_) {
-      // If AI extraction throws, degrade gracefully to the deterministic result
-      return harvestResult;
+    } on Object catch (error) {
+      // Degrading to the deterministic result is right — a failed model must
+      // never fail the whole extraction. Discarding *why* is not: the previous
+      // bare `catch (_)` made an AI stage that never completed look identical
+      // to one that ran and found nothing, which is undebuggable from the
+      // outside and cost real time to diagnose on a device.
+      return harvestResult.withAiOutcome(
+        AiOutcome.failed(provider.id, error.toString()),
+      );
     }
   }
 
@@ -139,7 +177,13 @@ class Extractor {
 
     final aiResult = await provider.extract(subSchema, contextText);
     if (!aiResult.isSuccessful || aiResult.data == null) {
-      return harvestResult;
+      // Ran, but produced nothing usable — distinct from never running.
+      return harvestResult.withAiOutcome(
+        AiOutcome.failed(
+          provider.id,
+          aiResult.error ?? 'returned no usable data',
+        ),
+      );
     }
 
     final aiData = aiResult.data;
@@ -173,6 +217,7 @@ class Extractor {
       data: mergedData,
       coverage: newCoverage,
       validation: validation,
+      aiOutcome: AiOutcome.succeeded(provider.id, usage: aiResult.usage),
     );
   }
 

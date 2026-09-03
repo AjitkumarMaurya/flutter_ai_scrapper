@@ -297,9 +297,13 @@ class _DemoHomeScreenState extends State<DemoHomeScreen> {
               if (context.mounted) {
                 showModalBottomSheet(
                   context: context,
-                  builder: (_) => Container(
-                    padding: const EdgeInsets.all(16.0),
-                    child: ResultViewer(result: result),
+                  isScrollControlled: true,
+                  builder: (ctx) => SizedBox(
+                    height: MediaQuery.of(ctx).size.height * 0.75,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: ResultViewer(result: result),
+                    ),
                   ),
                 );
               }

@@ -78,7 +78,8 @@ class ProviderChain implements AiProvider {
     required List<AiProvider> providers,
     this.allowCloudEgress = false,
     this.preferLocal = false,
-    this.providerTimeout = const Duration(seconds: 25),
+    this.providerTimeout = const Duration(seconds: 45),
+    this.localProviderTimeout = const Duration(minutes: 5),
     this.session,
     String? id,
   })  : id = id ?? 'provider-chain',
@@ -111,8 +112,18 @@ class ProviderChain implements AiProvider {
   /// Whether local providers are prioritized over remote cloud endpoints.
   final bool preferLocal;
 
-  /// Timeout per provider attempt.
+  /// Timeout per remote cloud provider attempt.
   final Duration providerTimeout;
+
+  /// Timeout per local on-device provider attempt.
+  ///
+  /// On-device language models on mobile devices require cold model load and
+  /// prompt prefill that can take 30–60+ seconds. Setting a 25s timeout causes
+  /// false-positive cancellations. Defaults to 3 minutes, matching [Extractor.localBudget].
+  final Duration localProviderTimeout;
+
+  Duration _timeoutFor(AiProvider provider) =>
+      provider.capabilities.isLocal ? localProviderTimeout : providerTimeout;
 
   /// Optional session tracker for token usage and savings accounting.
   final UsageSession? session;
@@ -124,14 +135,17 @@ class ProviderChain implements AiProvider {
 
   @override
   AiCapabilities get capabilities {
-    // Aggregate capabilities from the best available provider
-    return const AiCapabilities(
+    final candidate = _effectiveProviders.where(
+      (p) => allowCloudEgress || p.capabilities.isLocal,
+    ).firstOrNull ?? (_effectiveProviders.isNotEmpty ? _effectiveProviders.first : null);
+
+    return AiCapabilities(
       supportsJsonSchema: true,
       supportsTools: true,
-      maxContextTokens: 128000,
-      maxOutputTokens: 4096,
+      maxContextTokens: candidate?.capabilities.maxContextTokens ?? 128000,
+      maxOutputTokens: candidate?.capabilities.maxOutputTokens ?? 4096,
       supportsStreaming: true,
-      isLocal: false,
+      isLocal: candidate?.capabilities.isLocal ?? false,
     );
   }
 
@@ -238,24 +252,26 @@ class ProviderChain implements AiProvider {
     String content,
     List<String> warnings,
   ) async {
+    final timeout = _timeoutFor(provider);
+
     try {
       return await provider
           .extract(schema, content)
-          .timeout(providerTimeout);
+          .timeout(timeout);
     } on HttpException catch (e) {
       // 429: rate limited - retry with backoff once
       if (e.statusCode == 429) {
         await Future<void>.delayed(const Duration(milliseconds: 500));
         return await provider
             .extract(schema, content)
-            .timeout(providerTimeout);
+            .timeout(timeout);
       }
       // 5xx: server error - retry once
       if (e.statusCode != null && e.statusCode! >= 500) {
         await Future<void>.delayed(const Duration(milliseconds: 200));
         return await provider
             .extract(schema, content)
-            .timeout(providerTimeout);
+            .timeout(timeout);
       }
       rethrow;
     }
@@ -268,7 +284,7 @@ class ProviderChain implements AiProvider {
       if (!provider.isReady) continue;
 
       try {
-        return await provider.complete(prompt).timeout(providerTimeout);
+        return await provider.complete(prompt).timeout(_timeoutFor(provider));
       } catch (_) {
         continue;
       }

@@ -1,6 +1,7 @@
 /// Structured data mapper that projects harvested metadata onto a target Schema.
 library;
 
+import '../ai/ai_provider.dart';
 import '../dom/html_document.dart';
 import '../schema/field.dart';
 import '../schema/schema.dart';
@@ -69,12 +70,94 @@ class ExtractionCoverage {
 }
 
 /// Result of mapping harvested structured data onto a target [Schema].
+/// What happened when the AI stage was reached.
+///
+/// Exists because "the AI contributed nothing" and "the AI never finished" look
+/// identical in the data, and telling them apart from the outside was
+/// impossible until this was recorded.
+class AiOutcome {
+  /// Creates an outcome.
+  const AiOutcome({
+    required this.providerId,
+    required this.status,
+    this.detail,
+    this.budget,
+    this.usage,
+  });
+
+  /// The AI stage completed and its fields were merged.
+  const AiOutcome.succeeded(String providerId, {TokenUsage? usage})
+      : this(
+          providerId: providerId,
+          status: AiStatus.succeeded,
+          usage: usage,
+        );
+
+  /// The AI stage exceeded its wall-clock budget.
+  const AiOutcome.timedOut(String providerId, Duration budget)
+      : this(
+          providerId: providerId,
+          status: AiStatus.timedOut,
+          budget: budget,
+        );
+
+  /// The AI stage threw.
+  const AiOutcome.failed(String providerId, String detail)
+      : this(
+          providerId: providerId,
+          status: AiStatus.failed,
+          detail: detail,
+        );
+
+  /// Which provider was asked.
+  final String providerId;
+
+  /// How it ended.
+  final AiStatus status;
+
+  /// Error text, when the stage threw.
+  final String? detail;
+
+  /// The budget that was exceeded, when it timed out.
+  final Duration? budget;
+
+  /// Tokens the stage consumed, so a caller can meter or display real spend
+  /// rather than a figure nothing updates.
+  final TokenUsage? usage;
+
+  /// A short explanation suitable for a log line or a diagnostics panel.
+  String get message => switch (status) {
+        AiStatus.succeeded => '$providerId completed',
+        AiStatus.timedOut => '$providerId exceeded its '
+            '${budget?.inSeconds}s budget. On-device inference on a mid-range '
+            'phone can take longer than this; raise ExtractionOptions.timeout '
+            'or use a smaller model.',
+        AiStatus.failed => '$providerId failed: $detail',
+      };
+
+  @override
+  String toString() => 'AiOutcome(${status.name}: $message)';
+}
+
+/// How an AI stage ended.
+enum AiStatus {
+  /// Ran to completion.
+  succeeded,
+
+  /// Exceeded its wall-clock budget.
+  timedOut,
+
+  /// Threw before producing a result.
+  failed,
+}
+
 class StructuredHarvestResult {
   /// Creates a [StructuredHarvestResult].
   const StructuredHarvestResult({
     required this.data,
     required this.coverage,
     required this.validation,
+    this.aiOutcome,
   });
 
   /// The mapped and coerced data payload.
@@ -86,8 +169,24 @@ class StructuredHarvestResult {
   /// Schema validation and type coercion result.
   final ValidationResult validation;
 
+  /// What happened at the AI stage, or `null` if it was never reached.
+  ///
+  /// `null` means the deterministic path satisfied the schema and no inference
+  /// was needed — the good case. A non-null value with a non-succeeded status
+  /// is why fields are missing.
+  final AiOutcome? aiOutcome;
+
   /// Whether this extraction is partial (fields are missing or schema validation failed).
   bool get isPartial => !coverage.isComplete || !validation.isValid;
+
+  /// Returns a copy carrying [outcome].
+  StructuredHarvestResult withAiOutcome(AiOutcome outcome) =>
+      StructuredHarvestResult(
+        data: data,
+        coverage: coverage,
+        validation: validation,
+        aiOutcome: outcome,
+      );
 
   @override
   String toString() =>

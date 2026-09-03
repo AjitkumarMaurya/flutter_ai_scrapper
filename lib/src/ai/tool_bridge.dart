@@ -61,7 +61,10 @@ $schemaStr
 Document:
 $content
 
-Output only the JSON object, with no explanation, markdown formatting, or preamble.
+CRITICAL INSTRUCTIONS:
+- Do NOT output any <think> tags, internal monologue, reasoning, or explanation.
+- Start your response immediately with "{" and end with "}".
+- Output ONLY the JSON object.
 ''';
   }
 
@@ -82,12 +85,17 @@ $content
 
   /// Parses JSON from free-form text or Markdown code blocks as a fallback.
   static dynamic parseJsonFromProse(String text) {
-    final trimmed = text.trim();
+    var trimmed = text.trim();
+
+    // Strip thinking tags if present (e.g. Qwen3 / DeepSeek models)
+    final thinkClose = trimmed.indexOf('</think>');
+    if (thinkClose != -1) {
+      trimmed = trimmed.substring(thinkClose + 8).trim();
+    }
 
     // 1. Direct JSON parse
-    try {
-      return jsonDecode(trimmed);
-    } catch (_) {}
+    final direct = _tryParseJson(trimmed);
+    if (direct != null) return direct;
 
     // 2. Strip Markdown code fences ```json ... ```
     final codeBlockMatch = RegExp(
@@ -97,9 +105,8 @@ $content
 
     if (codeBlockMatch != null) {
       final code = codeBlockMatch.group(1)!.trim();
-      try {
-        return jsonDecode(code);
-      } catch (_) {}
+      final parsed = _tryParseJson(code);
+      if (parsed != null) return parsed;
     }
 
     // 3. Scan for first '{' and matching '}'
@@ -107,9 +114,8 @@ $content
     final endIdx = trimmed.lastIndexOf('}');
     if (startIdx != -1 && endIdx != -1 && endIdx > startIdx) {
       final substring = trimmed.substring(startIdx, endIdx + 1);
-      try {
-        return jsonDecode(substring);
-      } catch (_) {}
+      final parsed = _tryParseJson(substring);
+      if (parsed != null) return parsed;
     }
 
     // 4. Scan for array '[' and matching ']'
@@ -117,10 +123,82 @@ $content
     final arrEnd = trimmed.lastIndexOf(']');
     if (arrStart != -1 && arrEnd != -1 && arrEnd > arrStart) {
       final substring = trimmed.substring(arrStart, arrEnd + 1);
-      try {
-        return jsonDecode(substring);
-      } catch (_) {}
+      final parsed = _tryParseJson(substring);
+      if (parsed != null) return parsed;
     }
+
+    // 5. Unclosed bracket scan: '{' without matching '}'
+    if (startIdx != -1 && (endIdx == -1 || endIdx <= startIdx)) {
+      final unclosed = trimmed.substring(startIdx);
+      final parsed = _tryParseJson('$unclosed}');
+      if (parsed != null) return parsed;
+    }
+
+    // 6. Resilient key-value extraction fallback
+    final kvRegex = RegExp(
+      r'''["']?([a-zA-Z0-9_]+)["']?\s*(?::|as|is|=)\s*(?:["']([^"'\n\r]+)["']|(-?\d+(?:\.\d+)?)|(true|false|null))''',
+    );
+    final matches = kvRegex.allMatches(trimmed);
+    if (matches.isNotEmpty) {
+      final map = <String, dynamic>{};
+      for (final m in matches) {
+        final key = m.group(1)!;
+        if (m.group(2) != null) {
+          map[key] = m.group(2)!.trim();
+        } else if (m.group(3) != null) {
+          final numStr = m.group(3)!;
+          map[key] = numStr.contains('.')
+              ? double.tryParse(numStr)
+              : int.tryParse(numStr);
+        } else if (m.group(4) != null) {
+          final b = m.group(4)!;
+          map[key] = b == 'true' ? true : (b == 'false' ? false : null);
+        }
+      }
+      if (map.isNotEmpty) {
+        return map;
+      }
+    }
+
+    // 7. Monetary extraction fallback from free-form monologue
+    final moneyMatch = RegExp(r'([£$€])\s*(\d+(?:\.\d+)?)').firstMatch(text);
+    if (moneyMatch != null) {
+      final symbol = moneyMatch.group(1)!;
+      final amt = double.tryParse(moneyMatch.group(2)!);
+      if (amt != null) {
+        final currency = symbol == '£' ? 'GBP' : (symbol == r'$' ? 'USD' : 'EUR');
+        return {
+          'price': {
+            'amount': amt,
+            'currency': currency,
+          }
+        };
+      }
+    }
+
+    return null;
+  }
+
+  static dynamic _tryParseJson(String raw) {
+    var candidate = raw.trim();
+    try {
+      return jsonDecode(candidate);
+    } catch (_) {}
+
+    // Trailing comma cleanup: {"a": 1,} -> {"a": 1}
+    candidate = candidate.replaceAll(RegExp(r',\s*([}\]])'), r'$1');
+    try {
+      return jsonDecode(candidate);
+    } catch (_) {}
+
+    // Single quotes to double quotes
+    final fixedQuotes = candidate.replaceAllMapped(
+      RegExp(r"'([^'\\]*(?:\\.[^'\\]*)*)'"),
+      (m) => '"${m.group(1)}"',
+    );
+    try {
+      return jsonDecode(fixedQuotes);
+    } catch (_) {}
 
     return null;
   }

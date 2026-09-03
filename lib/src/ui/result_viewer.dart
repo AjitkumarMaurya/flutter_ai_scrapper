@@ -29,13 +29,46 @@ class ResultViewer extends StatelessWidget {
                   isScrollable: true,
                   tabAlignment: TabAlignment.start,
                   tabs: const [
-                    Tab(icon: Icon(Icons.table_chart_outlined), text: 'Table'),
-                    Tab(icon: Icon(Icons.data_object), text: 'JSON'),
                     Tab(
-                      icon: Icon(Icons.description_outlined),
-                      text: 'Markdown',
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.table_chart_outlined, size: 16),
+                          SizedBox(width: 6),
+                          Text('Table'),
+                        ],
+                      ),
                     ),
-                    Tab(icon: Icon(Icons.code), text: 'Raw'),
+                    Tab(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.data_object, size: 16),
+                          SizedBox(width: 6),
+                          Text('JSON'),
+                        ],
+                      ),
+                    ),
+                    Tab(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.description_outlined, size: 16),
+                          SizedBox(width: 6),
+                          Text('Markdown'),
+                        ],
+                      ),
+                    ),
+                    Tab(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.code, size: 16),
+                          SizedBox(width: 6),
+                          Text('Raw'),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),

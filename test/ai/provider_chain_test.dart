@@ -275,5 +275,28 @@ void _egressTests() {
         throwsA(isA<Exception>()),
       );
     });
+
+    test('local providers use localProviderTimeout allowing longer inference times', () async {
+      final slowLocal = FakeAiProvider(
+        id: 'slow-local',
+        capabilities: const AiCapabilities(isLocal: true),
+        simulatedDelay: const Duration(milliseconds: 150),
+        scriptedData: {'name': 'Done', 'score': 100},
+      );
+
+      final chain = ProviderChain(
+        providers: [slowLocal],
+        providerTimeout: const Duration(milliseconds: 50),
+        localProviderTimeout: const Duration(milliseconds: 500),
+      );
+
+      final result = await chain.extract(
+        Schema.object({'name': const Field.string(), 'score': const Field.integer()}),
+        'Doc',
+      );
+
+      expect(result.isSuccessful, isTrue);
+      expect(result.data['name'], 'Done');
+    });
   });
 }
