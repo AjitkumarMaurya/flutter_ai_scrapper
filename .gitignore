@@ -57,3 +57,16 @@ app.*.map.json
 .env.*
 *.keystore
 key.properties
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Databases
+data/*.db
+data/*.db-*
+*.sqlite
+*.sqlite3
+
