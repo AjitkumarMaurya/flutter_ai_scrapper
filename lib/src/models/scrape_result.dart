@@ -1,69 +1,38 @@
-/// Data model representing the result of a web scraping operation
 class ScrapeResult {
-  final List<String> data;
   final String url;
-  final DateTime timestamp;
-  final ScrapeType type;
-  final String? error;
-  final bool isSuccess;
+  final String title;
+  final String cleanText;
+  final String markdown;
+  final List<String> links;
+  final Map<String, List<String>> selectorMatches;
+  final Map<String, dynamic> structuredData;
+  final Map<String, dynamic>? aiExtractedData;
+  final bool fromCache;
+  final Duration elapsed;
 
-  ScrapeResult({
-    required this.data,
+  const ScrapeResult({
     required this.url,
-    required this.timestamp,
-    required this.type,
-    this.error,
-    required this.isSuccess,
+    required this.title,
+    required this.cleanText,
+    required this.markdown,
+    required this.links,
+    required this.selectorMatches,
+    required this.structuredData,
+    this.aiExtractedData,
+    required this.fromCache,
+    required this.elapsed,
   });
 
-  factory ScrapeResult.success({
-    required List<String> data,
-    required String url,
-    required ScrapeType type,
-  }) {
-    return ScrapeResult(
-      data: data,
-      url: url,
-      timestamp: DateTime.now(),
-      type: type,
-      isSuccess: true,
-    );
-  }
-
-  factory ScrapeResult.failure({
-    required String url,
-    required String error,
-    required ScrapeType type,
-  }) {
-    return ScrapeResult(
-      data: [],
-      url: url,
-      timestamp: DateTime.now(),
-      type: type,
-      error: error,
-      isSuccess: false,
-    );
-  }
-
-  @override
-  String toString() {
-    return 'ScrapeResult(isSuccess: $isSuccess, dataCount: ${data.length}, error: $error)';
-  }
-}
-
-/// Enum representing different types of scraping operations
-enum ScrapeType {
-  tagBased,
-  regexBased,
-}
-
-extension ScrapeTypeExtension on ScrapeType {
-  String get displayName {
-    switch (this) {
-      case ScrapeType.tagBased:
-        return 'Tag-based';
-      case ScrapeType.regexBased:
-        return 'Regex-based';
-    }
-  }
+  Map<String, dynamic> toJson() => {
+        'url': url,
+        'title': title,
+        'cleanText': cleanText,
+        'markdown': markdown,
+        'links': links,
+        'selectorMatches': selectorMatches,
+        'structuredData': structuredData,
+        if (aiExtractedData != null) 'aiExtractedData': aiExtractedData,
+        'fromCache': fromCache,
+        'elapsedMs': elapsed.inMilliseconds,
+      };
 }

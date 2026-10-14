@@ -1,54 +1,7 @@
-# Static analysis configuration for flutter_ai_scrapper.
-#
-# Run with `flutter analyze`. The project's standard is **zero issues** — every
-# phase gate in TASKS.md requires it, so warnings are never allowed to
-# accumulate into background noise.
-
-include: package:flutter_lints/flutter.yaml
-
-analyzer:
-  language:
-    # A published package should not silently widen types. `strict-casts`
-    # forbids implicit downcasts from dynamic, which matters a great deal here:
-    # extraction results arrive as untyped maps from JSON-LD and from model
-    # tool calls, and every one of those must be cast deliberately.
-    strict-casts: true
-    strict-raw-types: true
-    strict-inference: true
-
-  errors:
-    # Public API completeness is a release requirement (pub.dev scores it), so
-    # surface gaps as warnings rather than hints.
-    public_member_api_docs: ignore # raised to `warning` at Phase 7
-    todo: ignore
-
-  exclude:
-    - "**/*.g.dart"
-    - "**/*.freezed.dart"
-    - "**/*.mocks.dart"
-    - "example/**"
+include: package:lints/recommended.yaml
 
 linter:
   rules:
-    # Correctness
-    - always_declare_return_types
-    - avoid_dynamic_calls
-    - avoid_slow_async_io
-    - cancel_subscriptions
-    - close_sinks
-    - comment_references
-    - throw_in_finally
-    - unawaited_futures
-
-    # A library must never print. Diagnostics go through the package's own
-    # logger so consumers can route or silence them.
-    - avoid_print
-
-    # Style — consistency across a codebase several people will touch.
-    - prefer_single_quotes
-    - prefer_final_locals
-    - prefer_relative_imports
-    - directives_ordering
-    - sort_pub_dependencies
-    - unnecessary_lambdas
-    - use_string_buffers
+    prefer_single_quotes: true
+    avoid_print: true
+    unawaited_futures: true

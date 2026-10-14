@@ -1,57 +1,16 @@
 name: flutter_ai_scrapper
-description: >-
-  On-device AI web scraping for Flutter. Parses real HTML with a DOM, harvests
-  JSON-LD and OpenGraph for free, and falls back to a local Gemma model or any
-  OpenAI/Claude-compatible provider for schema-typed extraction.
+description: High-performance, isolate-powered web scraper and AI structured data extractor for Flutter & Dart.
 version: 2.0.0
-
-repository: https://github.com/raghav117/flutter_scrapper
-homepage: https://github.com/raghav117/flutter_scrapper
-issue_tracker: https://github.com/raghav117/flutter_scrapper/issues
-
-topics:
-  - scraping
-  - html
-  - ai
-  - on-device
-  - gemma
-
-# Android and iOS only, by decision. Desktop and Web are out of scope for 2.0:
-# Web cannot fetch third-party pages at all (CORS), and desktop is deferred
-# rather than half-supported. Declaring this here makes pub.dev state it
-# plainly instead of letting consumers discover it at runtime.
-platforms:
-  android:
-  ios:
+homepage: https://github.com/ajitkumarmaurya/flutter_ai_scrapper
 
 environment:
-  sdk: ">=3.12.0 <4.0.0"
-  flutter: ">=3.44.0"
+  sdk: '>=3.2.0 <4.0.0'
 
 dependencies:
-  # Stable cache keys derived from URLs.
-  crypto: "^3.0.6"
-  flutter:
-    sdk: flutter
-  # On-device AI inference with Gemma and other small LLMs
-  flutter_gemma: "^1.7.0"
-  # Spec-compliant HTML5 parsing with CSS selectors. This replaces every
-  # extraction regex in 1.x — regex cannot parse a nested, malformed,
-  # entity-encoded grammar, which is what HTML is.
-  html: "^0.15.7"
-  # HTTP transport for the fetch stage.
-  http: "^1.6.0"
-  meta: "^1.15.0"
-  # Durable cache directory. Directory.systemTemp is OS-evictable, so the
-  # "persistent" cache in 1.x silently was not.
-  path_provider: "^2.1.6"
+  http: ^1.2.1
+  html: ^0.15.4
+  crypto: ^3.0.3
 
 dev_dependencies:
-  build_runner: "^2.9.0"
-  flutter_lints: "^6.0.0"
-  flutter_test:
-    sdk: flutter
-  mockito: "^5.5.1"
-
-flutter:
-  uses-material-design: true
+  lints: ^4.0.0
+  test: ^1.25.2
